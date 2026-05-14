@@ -15,7 +15,7 @@ fi
 echo "Current active environment is $CURRENT_COLOR"
 echo "Deploying to target environment: $TARGET_COLOR"
 
-docker-compose build app-$TARGET_COLOR
+docker-compose pull app-$TARGET_COLOR
 docker-compose up -d app-$TARGET_COLOR
 
 echo "Waiting for health check on $TARGET_COLOR..."

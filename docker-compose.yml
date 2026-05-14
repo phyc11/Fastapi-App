@@ -2,8 +2,7 @@ version: '3.8'
 
 services:
   app-blue:
-    build: .
-    image: fastapi-app:latest
+    image: ghcr.io/phyc11/fastapi-app:latest
     container_name: fastapi-blue
     ports:
       - "8001:8000"
@@ -17,8 +16,7 @@ services:
       - webnet
 
   app-green:
-    build: .
-    image: fastapi-app:latest
+    image: ghcr.io/phyc11/fastapi-app:latest
     container_name: fastapi-green
     ports:
       - "8002:8000"
