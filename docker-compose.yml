@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  app-blue:
+    build: .
+    image: fastapi-app:latest
+    container_name: fastapi-blue
+    ports:
+      - "8001:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - webnet
+
+  app-green:
+    build: .
+    image: fastapi-app:latest
+    container_name: fastapi-green
+    ports:
+      - "8002:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - webnet
+
+networks:
+  webnet:
+    driver: bridge

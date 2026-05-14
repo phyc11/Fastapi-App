@@ -1,0 +1,31 @@
+[project]
+name = "my-python-ci"
+version = "0.1.0"
+dependencies = [
+    "fastapi",
+    "uvicorn"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "ruff",
+    "black",
+    "httpx"
+]
+
+[tool.black]
+line-length = 88
+
+[tool.ruff]
+line-length = 88
+
+[tool.pyright]
+extraPaths = ["."]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+
+[tool.coverage.run]
+relative_files = true

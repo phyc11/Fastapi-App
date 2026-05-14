@@ -1,0 +1,9 @@
+pyproject.toml
+src/__init__.py
+src/app.py
+src/my_python_ci.egg-info/PKG-INFO
+src/my_python_ci.egg-info/SOURCES.txt
+src/my_python_ci.egg-info/dependency_links.txt
+src/my_python_ci.egg-info/requires.txt
+src/my_python_ci.egg-info/top_level.txt
+tests/test_app.py
