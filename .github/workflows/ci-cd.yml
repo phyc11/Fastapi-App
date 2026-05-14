@@ -157,7 +157,6 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Execute Blue-Green Deploy
-        shell: bash
         run: |
           echo "Deployment initiated using Blue-Green strategy"
           echo "Quality gates passed. Proceeding with deployment..."

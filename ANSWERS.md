@@ -1,4 +1,4 @@
-# Answers to Project Questions
+# Answers to Final Exam Questions
 
 ### 1. Explain why multi-stage builds are used in the Dockerfile and how they improve both image size and security.
 **Answer:**

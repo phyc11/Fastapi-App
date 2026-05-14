@@ -54,15 +54,17 @@ git push -u origin main
 Mở tab **Actions** trên GitHub repository để xem tiến trình chạy của các Jobs:
 1. **Lint Code**: Kiểm tra định dạng code và lỗi.
 2. **Run Tests and Coverage**: Chạy Unit tests bằng lệnh `pytest --cov=src --cov-report=xml` (sẽ sinh ra file `coverage.xml`).
-3. **SonarQube Scan & Quality Gate**: Phân tích mã nguồn dựa trên code và `coverage.xml`. Nếu không đạt chuẩn Quality Gate (vd: Coverage < 80%, có Vulnerabilities), **pipeline sẽ thất bại (blocked) và dừng lại**, ngăn không cho chạy bước tiếp theo.
-4. **Build Docker Image**: Tiến hành build multi-stage image. Image được thu nhỏ và bảo mật qua User `appuser`.
-5. **Deploy (Blue-Green)**: Khởi chạy kịch bản Blue-Green qua mô phỏng của `deploy.sh`.
+3. **SonarQube Scan & Quality Gate**: Phân tích mã nguồn dựa trên code và `coverage.xml`. Nếu không đạt chuẩn Quality Gate (vd: Coverage < 80%, có Vulnerabilities), **pipeline sẽ thất bại (blocked) và dừng lại**.
+4. **Build, Push & Scan (Trivy)**: Build Docker image từ Dockerfile, sau đó **đẩy thẳng lên kho lưu trữ GitHub Container Registry (GHCR)**. Tiếp theo, sử dụng công cụ **Trivy** để quét các lỗ hổng bảo mật bên trong Image.
+5. **Deploy (Blue-Green)**: Kích hoạt Self-hosted Runner trên máy chủ của bạn để kéo (pull) Image từ GHCR về và tự động chạy kịch bản `deploy.sh`.
 
-### 3. Chạy và kiểm thử Blue-Green Deploy trên Local
-Để mô phỏng chính xác những gì Deploy Job thực hiện, bạn có thể chạy file Bash script trực tiếp trên máy của mình (yêu cầu Docker Desktop & Git Bash / WSL / Linux):
-```bash
-bash deploy.sh
-```
-- **Lần chạy đầu tiên**: Script nhận diện chưa có container, khởi tạo môi trường **blue** (port `8001`), đợi health check `healthy`.
-- **Lần chạy thứ hai**: Script nhận diện **blue** đang chạy, tiến hành khởi tạo môi trường **green** (port `8002`). Nếu **green** pass health check, traffic được mô phỏng chuyển đổi sang green và script sẽ stop container **blue**.
-- **Rollback tự động**: Nếu bản release mới (vd green) bị lỗi (crash, sai port) dẫn đến health check thất bại, script sẽ in ra log lỗi, dừng ngay quá trình deploy và giữ nguyên bản **blue** đang ổn định, đạt yêu cầu *Zero-Downtime*.
+### 3. Hướng dẫn thiết lập Self-hosted Runner để Deploy Thực tế
+Dự án này sử dụng mô hình Deploy chuẩn Enterprise: Máy chủ (VPS/Local) sẽ lắng nghe lệnh từ GitHub Actions thông qua Self-hosted Runner.
+1. Vào Repo GitHub -> **Settings** -> **Actions** -> **Runners** -> **New self-hosted runner**.
+2. Làm theo hướng dẫn trên màn hình để tải và cài đặt Runner trên máy của bạn (Windows/Linux).
+3. Chạy file `run.cmd` (hoặc `./run.sh`). Màn hình hiển thị `Listening for Jobs` nghĩa là đã sẵn sàng.
+4. Mỗi khi có code mới được merge vào nhánh `main`, GitHub Actions sẽ chạy qua các bước kiểm định (SonarQube, Trivy). Nếu tất cả đều **Passed**, nó sẽ ra lệnh cho con Runner trên máy bạn tự động gọi file `bash deploy.sh`.
+
+- **Lần chạy đầu tiên**: Script nhận diện chưa có container, tải Image từ GHCR, khởi tạo môi trường **blue** (port `8001`), đợi health check `healthy`.
+- **Lần chạy thứ hai**: Script nhận diện **blue** đang chạy, khởi tạo môi trường **green** (port `8002`). Nếu **green** pass health check, traffic được chuyển sang green và script sẽ stop container **blue**.
+- **Rollback tự động**: Nếu bản release mới bị lỗi dẫn đến health check thất bại, script sẽ in ra log lỗi, dừng quá trình deploy và giữ nguyên bản đang ổn định, đạt yêu cầu *Zero-Downtime*.
