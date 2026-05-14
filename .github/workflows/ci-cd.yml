@@ -111,15 +111,16 @@ jobs:
 
   deploy:
     name: Deploy (Blue-Green)
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: build
     if: github.ref == 'refs/heads/main'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup environment for deployment
+      - name: Execute Blue-Green Deploy
+        shell: bash
         run: |
-          chmod +x deploy.sh
           echo "Deployment initiated using Blue-Green strategy"
           echo "Quality gates passed. Proceeding with deployment..."
+          bash deploy.sh

@@ -3,8 +3,8 @@
 ### 1. Explain why multi-stage builds are used in the Dockerfile and how they improve both image size and security.
 **Answer:**
 Multi-stage builds are used to separate the build environment from the runtime environment in a Docker image. 
-- **Image Size Improvement:** By using a `builder` stage, we can install dependencies (like `gcc`, build tools, and `pip` packages) to compile and prepare the application environment. In the `runtime` stage, we only copy the necessary artifacts (like the compiled python virtual environment) from the builder stage. This drastically reduces the final image size by discarding build tools and cache files.
-- **Security Improvement:** A smaller image means a smaller attack surface. Because the final runtime image doesn't contain build tools, compilers, or package managers (which could be exploited by attackers to download or compile malicious payloads), the container is much more secure. Furthermore, our Dockerfile implements a non-root user (`appuser`) in the runtime stage, ensuring that even if the container is compromised, the attacker does not have root privileges.
+- **Image Size Improvement:** By using a `builder` stage, we can install dependencies to compile and prepare the application environment. In the `runtime` stage, we only copy the necessary artifacts from the builder stage. This reduces the final image size by discarding build tools and cache files.
+- **Security Improvement:** A smaller image means a smaller attack surface. Because the final runtime image doesn't contain build tools, compilers, or package managers which could be exploited by attackers to download or compile malicious payloads, the container is more secure. Furthermore, our Dockerfile implements a non-root user (`appuser`) in the runtime stage, ensuring that even if the container is compromised, the attacker does not have root privileges.
 
 ### 2. Describe the complete CI/CD pipeline flow from a developer pushing code to the application being deployed in production.
 **Answer:**
