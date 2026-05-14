@@ -160,4 +160,4 @@ jobs:
         run: |
           echo "Deployment initiated using Blue-Green strategy"
           echo "Quality gates passed. Proceeding with deployment..."
-          bash deploy.sh
+          bash -c "sed -i 's/\r$//' deploy.sh && bash deploy.sh"
