@@ -1,5 +1,7 @@
+import pytest
 from fastapi.testclient import TestClient
-from src.app import add, app, average, divide, greet, modulo, multiply, subtract
+
+from src.app import add, app, average, divide, greet, modulo, multiply, power, subtract
 
 client = TestClient(app)
 
@@ -30,6 +32,15 @@ def test_average():
 
 def test_greet():
     assert greet("Alice") == "Hello, Alice!"
+
+
+def test_power():
+    assert power(2, 3) == 8
+
+
+def test_power_rejects_negative_exponent():
+    with pytest.raises(ValueError, match="Exponent must be non-negative"):
+        power(2, -1)
 
 
 def test_read_root():
@@ -81,3 +92,15 @@ def test_greet_endpoint():
     response = client.get("/greet?name=Alice")
     assert response.status_code == 200
     assert response.json() == {"message": "Hello, Alice!"}
+
+
+def test_power_endpoint():
+    response = client.get("/power?a=2&b=4")
+    assert response.status_code == 200
+    assert response.json() == {"result": 16}
+
+
+def test_power_endpoint_rejects_negative_exponent():
+    response = client.get("/power?a=2&b=-1")
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Exponent must be non-negative"}

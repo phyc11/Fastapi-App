@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 import uvicorn
 
 app = FastAPI()
@@ -31,6 +31,12 @@ def average(a: int, b: int) -> float:
 
 def greet(name: str) -> str:
     return f"Hello, {name}!"
+
+
+def power(a: int, b: int) -> int:
+    if b < 0:
+        raise ValueError("Exponent must be non-negative")
+    return a ** b
 
 
 @app.get("/")
@@ -71,6 +77,14 @@ def average_endpoint(a: int = 0, b: int = 0):
 @app.get("/greet")
 def greet_endpoint(name: str):
     return {"message": greet(name)}
+
+
+@app.get("/power")
+def power_endpoint(a: int = 0, b: int = 0):
+    try:
+        return {"result": power(a, b)}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 if __name__ == "__main__":
