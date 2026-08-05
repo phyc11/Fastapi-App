@@ -1,5 +1,5 @@
 from fastapi.testclient import TestClient
-from src.app import add, app, average, divide, modulo, multiply, subtract
+from src.app import add, app, average, divide, greet, modulo, multiply, subtract
 
 client = TestClient(app)
 
@@ -26,6 +26,10 @@ def test_modulo():
 
 def test_average():
     assert average(5, 8) == 6.5
+
+
+def test_greet():
+    assert greet("Alice") == "Hello, Alice!"
 
 
 def test_read_root():
@@ -71,3 +75,9 @@ def test_average_endpoint():
     response = client.get("/average?a=5&b=8")
     assert response.status_code == 200
     assert response.json() == {"result": 6.5}
+
+
+def test_greet_endpoint():
+    response = client.get("/greet?name=Alice")
+    assert response.status_code == 200
+    assert response.json() == {"message": "Hello, Alice!"}
