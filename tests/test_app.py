@@ -1,5 +1,5 @@
 from fastapi.testclient import TestClient
-from src.app import add, app, multiply, subtract
+from src.app import add, app, divide, multiply, subtract
 
 client = TestClient(app)
 
@@ -14,6 +14,10 @@ def test_subtract():
 
 def test_multiply():
     assert multiply(5, 3) == 15
+
+
+def test_divide():
+    assert divide(6, 3) == 2.0
 
 
 def test_read_root():
@@ -41,3 +45,9 @@ def test_multiply_endpoint():
     response = client.get("/multiply?a=6&b=7")
     assert response.status_code == 200
     assert response.json() == {"result": 42}
+
+
+def test_divide_endpoint():
+    response = client.get("/divide?a=8&b=4")
+    assert response.status_code == 200
+    assert response.json() == {"result": 2.0}
