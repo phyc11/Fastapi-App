@@ -25,6 +25,10 @@ def modulo(a: int, b: int) -> int:
     return a % b
 
 
+def average(a: int, b: int) -> float:
+    return add(a, b) / 2
+
+
 @app.get("/")
 def read_root():
     return {"status": "OK", "message": "FastAPI service is running"}
@@ -53,6 +57,11 @@ def divide_endpoint(a: int = 0, b: int = 0):
 @app.get("/modulo")
 def modulo_endpoint(a: int = 0, b: int = 0):
     return {"result": modulo(a, b)}
+
+
+@app.get("/average")
+def average_endpoint(a: int = 0, b: int = 0):
+    return {"result": average(a, b)}
 
 
 if __name__ == "__main__":
