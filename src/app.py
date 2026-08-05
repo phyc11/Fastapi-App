@@ -13,6 +13,10 @@ def subtract(a: int, b: int) -> int:
     return a - b
 
 
+def multiply(a: int, b: int) -> int:
+    return a * b
+
+
 @app.get("/")
 def read_root():
     return {"status": "OK", "message": "FastAPI service is running"}
@@ -26,6 +30,11 @@ def add_endpoint(a: int = 0, b: int = 0):
 @app.get("/subtract")
 def subtract_endpoint(a: int = 0, b: int = 0):
     return {"result": subtract(a, b)}
+
+
+@app.get("/multiply")
+def multiply_endpoint(a: int = 0, b: int = 0):
+    return {"result": multiply(a, b)}
 
 
 if __name__ == "__main__":
