@@ -1,8 +1,30 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from src.app import add, app, average, celsius_to_fahrenheit, divide, fahrenheit_to_celsius, fibonacci, greet, increment, is_palindrome, is_prime, mean, median, modulo, multiply, power, reverse_string, stddev, subtract
-from src.app import add, app, average, divide, fibonacci, gcd, greet, increment, is_palindrome, is_prime, lcm, mean, median, modulo, multiply, power, reverse_string, stddev, subtract
+from src.app import (
+    add,
+    app,
+    average,
+    celsius_to_fahrenheit,
+    divide,
+    fahrenheit_to_celsius,
+    fibonacci,
+    gcd,
+    greet,
+    increment,
+    is_palindrome,
+    is_prime,
+    lcm,
+    mean,
+    median,
+    modulo,
+    multiply,
+    power,
+    reverse_string,
+    sort_numbers,
+    stddev,
+    subtract,
+)
 
 client = TestClient(app)
 
@@ -131,6 +153,24 @@ def test_celsius_to_fahrenheit(celsius, expected):
 @pytest.mark.parametrize(("fahrenheit", "expected"), [(32, 0), (212, 100), (-40, -40)])
 def test_fahrenheit_to_celsius(fahrenheit, expected):
     assert fahrenheit_to_celsius(fahrenheit) == pytest.approx(expected)
+
+@pytest.mark.parametrize(
+    ("numbers", "expected"),
+    [
+        ([3, 1, 2], [1, 2, 3]),
+        ([4, -1, 4, 0], [-1, 0, 4, 4]),
+        ([], []),
+        ([1], [1]),
+    ],
+)
+def test_sort_numbers(numbers, expected):
+    assert sort_numbers(numbers) == expected
+
+
+def test_sort_numbers_does_not_mutate_input():
+    numbers = [3, 1, 2]
+    sort_numbers(numbers)
+    assert numbers == [3, 1, 2]
 
 def test_greet():
     assert greet("Alice") == "Hello, Alice!"
@@ -297,6 +337,32 @@ def test_convert_temp_endpoint_rejects_invalid_unit():
     response = client.get("/convert-temp?value=25&unit=K")
     assert response.status_code == 400
     assert response.json() == {"detail": "unit must be 'C' or 'F'"}
+
+def test_sort_endpoint():
+    response = client.get("/sort?numbers=3,1,2")
+    assert response.status_code == 200
+    assert response.json() == {"result": [1.0, 2.0, 3.0]}
+
+
+def test_sort_endpoint_calls_sort_numbers(monkeypatch):
+    calls = []
+
+    def tracked_sort_numbers(numbers):
+        calls.append(numbers)
+        return [99.0]
+
+    monkeypatch.setattr("src.app.sort_numbers", tracked_sort_numbers)
+    response = client.get("/sort?numbers=3,1,2")
+    assert response.status_code == 200
+    assert response.json() == {"result": [99.0]}
+    assert calls == [[3.0, 1.0, 2.0]]
+
+
+@pytest.mark.parametrize("numbers", ["", "3,two,1", "3,,1"])
+def test_sort_endpoint_rejects_empty_or_invalid_numbers(numbers):
+    response = client.get("/sort", params={"numbers": numbers})
+    assert response.status_code == 400
+    assert response.json()["detail"]
 
 def test_greet_endpoint():
     response = client.get("/greet?name=Alice")
