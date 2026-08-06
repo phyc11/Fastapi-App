@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from src.app import add, app, average, divide, greet, increment, modulo, multiply, power, subtract
+from src.app import add, app, average, divide, greet, increment, mean, median, modulo, multiply, power, stddev, subtract
 
 client = TestClient(app)
 
@@ -33,6 +33,24 @@ def test_modulo():
 def test_average():
     assert average(5, 8) == 6.5
 
+
+def test_mean():
+    assert mean([1, 2, 3, 4]) == 2.5
+
+
+def test_median_for_odd_and_even_lengths():
+    assert median([3, 1, 2]) == 2
+    assert median([4, 1, 3, 2]) == 2.5
+
+
+def test_stddev():
+    assert stddev([1, 2, 3]) == pytest.approx((2 / 3) ** 0.5)
+
+
+@pytest.mark.parametrize("function", [mean, median, stddev])
+def test_statistics_functions_reject_empty_lists(function):
+    with pytest.raises(ValueError, match="numbers must not be empty"):
+        function([])
 
 def test_greet():
     assert greet("Alice") == "Hello, Alice!"
@@ -97,6 +115,22 @@ def test_average_endpoint():
     assert response.status_code == 200
     assert response.json() == {"result": 6.5}
 
+
+def test_stats_endpoint():
+    response = client.get("/stats?numbers=1,2,3")
+    assert response.status_code == 200
+    assert response.json() == {
+        "mean": 2.0,
+        "median": 2.0,
+        "stddev": pytest.approx((2 / 3) ** 0.5),
+    }
+
+
+@pytest.mark.parametrize("numbers", ["", "1,two,3", "1,,3"])
+def test_stats_endpoint_rejects_empty_or_invalid_numbers(numbers):
+    response = client.get("/stats", params={"numbers": numbers})
+    assert response.status_code == 400
+    assert response.json()["detail"]
 
 def test_greet_endpoint():
     response = client.get("/greet?name=Alice")

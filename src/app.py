@@ -1,4 +1,5 @@
 import os
+from math import isfinite, sqrt
 from fastapi import FastAPI, HTTPException
 import uvicorn
 
@@ -32,6 +33,28 @@ def modulo(a: int, b: int) -> int:
 def average(a: int, b: int) -> float:
     return add(a, b) / 2
 
+
+def mean(numbers: list[int | float]) -> float:
+    if not numbers:
+        raise ValueError("numbers must not be empty")
+    return sum(numbers) / len(numbers)
+
+
+def median(numbers: list[int | float]) -> int | float:
+    if not numbers:
+        raise ValueError("numbers must not be empty")
+
+    sorted_numbers = sorted(numbers)
+    midpoint = len(sorted_numbers) // 2
+    if len(sorted_numbers) % 2:
+        return sorted_numbers[midpoint]
+    return (sorted_numbers[midpoint - 1] + sorted_numbers[midpoint]) / 2
+
+
+def stddev(numbers: list[int | float]) -> float:
+    average_value = mean(numbers)
+    variance = sum((number - average_value) ** 2 for number in numbers) / len(numbers)
+    return sqrt(variance)
 
 def greet(name: str) -> str:
     return f"Hello, {name}!"
@@ -82,6 +105,22 @@ def modulo_endpoint(a: int = 0, b: int = 0):
 def average_endpoint(a: int = 0, b: int = 0):
     return {"result": average(a, b)}
 
+
+@app.get("/stats")
+def stats_endpoint(numbers: str = ""):
+    try:
+        if not numbers.strip():
+            raise ValueError("numbers must not be empty")
+        parsed_numbers = [float(value.strip()) for value in numbers.split(",")]
+        if not all(isfinite(number) for number in parsed_numbers):
+            raise ValueError("numbers must contain only finite numeric values")
+        return {
+            "mean": mean(parsed_numbers),
+            "median": median(parsed_numbers),
+            "stddev": stddev(parsed_numbers),
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 @app.get("/greet")
 def greet_endpoint(name: str):
