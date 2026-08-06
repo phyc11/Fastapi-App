@@ -103,6 +103,17 @@ def celsius_to_fahrenheit(c: int | float) -> float:
 def fahrenheit_to_celsius(f: int | float) -> float:
     return (f - 32) * 5 / 9
 
+def sort_numbers(numbers: list[int | float]) -> list[int | float]:
+    result = numbers.copy()
+    for index in range(1, len(result)):
+        current = result[index]
+        position = index - 1
+        while position >= 0 and result[position] > current:
+            result[position + 1] = result[position]
+            position -= 1
+        result[position + 1] = current
+    return result
+
 def greet(name: str) -> str:
     return f"Hello, {name}!"
 
@@ -198,6 +209,18 @@ def convert_temp_endpoint(value: float, unit: str):
     if unit == "F":
         return {"result": fahrenheit_to_celsius(value)}
     raise HTTPException(status_code=400, detail="unit must be 'C' or 'F'")
+
+@app.get("/sort")
+def sort_endpoint(numbers: str = ""):
+    try:
+        if not numbers.strip():
+            raise ValueError("numbers must not be empty")
+        parsed_numbers = [float(value.strip()) for value in numbers.split(",")]
+        if not all(isfinite(number) for number in parsed_numbers):
+            raise ValueError("numbers must contain only finite numeric values")
+        return {"result": sort_numbers(parsed_numbers)}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 @app.get("/greet")
 def greet_endpoint(name: str):
