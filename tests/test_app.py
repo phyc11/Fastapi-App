@@ -2,6 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.app import add, app, average, celsius_to_fahrenheit, divide, fahrenheit_to_celsius, fibonacci, greet, increment, is_palindrome, is_prime, mean, median, modulo, multiply, power, reverse_string, stddev, subtract
+from src.app import add, app, average, divide, fibonacci, gcd, greet, increment, is_palindrome, is_prime, lcm, mean, median, modulo, multiply, power, reverse_string, stddev, subtract
 
 client = TestClient(app)
 
@@ -60,6 +61,33 @@ def test_stddev():
 def test_statistics_functions_reject_empty_lists(function):
     with pytest.raises(ValueError, match="numbers must not be empty"):
         function([])
+
+@pytest.mark.parametrize(
+    ("a", "b", "expected"),
+    [(12, 18, 6), (18, 12, 6), (-12, 18, 6), (0, 5, 5), (0, 0, 0)],
+)
+def test_gcd(a, b, expected):
+    assert gcd(a, b) == expected
+
+
+def test_lcm_calls_gcd(monkeypatch):
+    calls = []
+
+    def tracked_gcd(a, b):
+        calls.append((a, b))
+        return 2
+
+    monkeypatch.setattr("src.app.gcd", tracked_gcd)
+    assert lcm(4, 6) == 12
+    assert calls == [(4, 6)]
+
+
+@pytest.mark.parametrize(
+    ("a", "b", "expected"),
+    [(4, 6, 12), (-4, 6, 12), (0, 6, 0), (0, 0, 0)],
+)
+def test_lcm(a, b, expected):
+    assert lcm(a, b) == expected
 
 @pytest.mark.parametrize("n", [2, 3, 5, 11, 97])
 def test_is_prime_for_prime_numbers(n):
@@ -194,6 +222,25 @@ def test_stats_endpoint_rejects_empty_or_invalid_numbers(numbers):
     response = client.get("/stats", params={"numbers": numbers})
     assert response.status_code == 400
     assert response.json()["detail"]
+
+def test_lcm_endpoint():
+    response = client.get("/lcm?a=4&b=6")
+    assert response.status_code == 200
+    assert response.json() == {"result": 12}
+
+
+def test_lcm_endpoint_calls_lcm(monkeypatch):
+    calls = []
+
+    def tracked_lcm(a, b):
+        calls.append((a, b))
+        return 99
+
+    monkeypatch.setattr("src.app.lcm", tracked_lcm)
+    response = client.get("/lcm?a=8&b=12")
+    assert response.status_code == 200
+    assert response.json() == {"result": 99}
+    assert calls == [(8, 12)]
 
 @pytest.mark.parametrize(("n", "expected"), [(29, True), (49, False)])
 def test_is_prime_endpoint(n, expected):
