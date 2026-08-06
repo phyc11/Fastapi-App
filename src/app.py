@@ -65,6 +65,19 @@ def stddev(numbers: list[int | float]) -> float:
     variance = sum((number - average_value) ** 2 for number in numbers) / len(numbers)
     return sqrt(variance)
 
+def gcd(a: int, b: int) -> int:
+    a, b = abs(a), abs(b)
+    while b:
+        a, b = b, a % b
+    return a
+
+
+def lcm(a: int, b: int) -> int:
+    divisor = gcd(a, b)
+    if divisor == 0:
+        return 0
+    return abs(a * b) // divisor
+
 def is_prime(n: int) -> bool:
     if n < 2:
         raise ValueError("n must be at least 2")
@@ -155,6 +168,10 @@ def stats_endpoint(numbers: str = ""):
         }
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+@app.get("/lcm")
+def lcm_endpoint(a: int = 0, b: int = 0):
+    return {"result": lcm(a, b)}
 
 @app.get("/is-prime")
 def is_prime_endpoint(n: int = 0):
