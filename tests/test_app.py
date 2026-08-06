@@ -5,6 +5,7 @@ from src.app import (
     add,
     app,
     average,
+    clamp,
     celsius_to_fahrenheit,
     divide,
     fahrenheit_to_celsius,
@@ -171,6 +172,26 @@ def test_sort_numbers_does_not_mutate_input():
     numbers = [3, 1, 2]
     sort_numbers(numbers)
     assert numbers == [3, 1, 2]
+
+@pytest.mark.parametrize(
+    ("value", "min_value", "max_value", "expected"),
+    [
+        (-1, 0, 10, 0),
+        (11, 0, 10, 10),
+        (5, 0, 10, 5),
+        (0, 0, 10, 0),
+        (10, 0, 10, 10),
+    ],
+)
+def test_clamp(value, min_value, max_value, expected):
+    assert clamp(value, min_value, max_value) == expected
+
+
+def test_clamp_rejects_invalid_range():
+    with pytest.raises(
+        ValueError, match="min_value must be less than or equal to max_value"
+    ):
+        clamp(5, 10, 0)
 
 def test_greet():
     assert greet("Alice") == "Hello, Alice!"
@@ -363,6 +384,38 @@ def test_sort_endpoint_rejects_empty_or_invalid_numbers(numbers):
     response = client.get("/sort", params={"numbers": numbers})
     assert response.status_code == 400
     assert response.json()["detail"]
+
+@pytest.mark.parametrize(
+    ("value", "expected"), [(-1, 0.0), (5, 5.0), (11, 10.0)]
+)
+def test_clamp_endpoint(value, expected):
+    response = client.get(
+        "/clamp", params={"value": value, "min_value": 0, "max_value": 10}
+    )
+    assert response.status_code == 200
+    assert response.json() == {"result": expected}
+
+
+def test_clamp_endpoint_calls_clamp(monkeypatch):
+    calls = []
+
+    def tracked_clamp(value, min_value, max_value):
+        calls.append((value, min_value, max_value))
+        return 99.0
+
+    monkeypatch.setattr("src.app.clamp", tracked_clamp)
+    response = client.get("/clamp?value=5&min_value=0&max_value=10")
+    assert response.status_code == 200
+    assert response.json() == {"result": 99.0}
+    assert calls == [(5.0, 0.0, 10.0)]
+
+
+def test_clamp_endpoint_rejects_invalid_range():
+    response = client.get("/clamp?value=5&min_value=10&max_value=0")
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": "min_value must be less than or equal to max_value"
+    }
 
 def test_greet_endpoint():
     response = client.get("/greet?name=Alice")

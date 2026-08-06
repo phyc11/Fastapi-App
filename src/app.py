@@ -114,6 +114,19 @@ def sort_numbers(numbers: list[int | float]) -> list[int | float]:
         result[position + 1] = current
     return result
 
+def clamp(
+    value: int | float,
+    min_value: int | float,
+    max_value: int | float,
+) -> int | float:
+    if min_value > max_value:
+        raise ValueError("min_value must be less than or equal to max_value")
+    if value < min_value:
+        return min_value
+    if value > max_value:
+        return max_value
+    return value
+
 def greet(name: str) -> str:
     return f"Hello, {name}!"
 
@@ -219,6 +232,13 @@ def sort_endpoint(numbers: str = ""):
         if not all(isfinite(number) for number in parsed_numbers):
             raise ValueError("numbers must contain only finite numeric values")
         return {"result": sort_numbers(parsed_numbers)}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+@app.get("/clamp")
+def clamp_endpoint(value: float, min_value: float, max_value: float):
+    try:
+        return {"result": clamp(value, min_value, max_value)}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
