@@ -1,6 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from src.app import add, app, average, celsius_to_fahrenheit, divide, fahrenheit_to_celsius, fibonacci, greet, increment, is_palindrome, is_prime, mean, median, modulo, multiply, power, reverse_string, stddev, subtract
 from src.app import add, app, average, divide, fibonacci, gcd, greet, increment, is_palindrome, is_prime, lcm, mean, median, modulo, multiply, power, reverse_string, stddev, subtract
 
 client = TestClient(app)
@@ -121,6 +122,15 @@ def test_is_palindrome_calls_reverse_string(monkeypatch):
 
 def test_is_palindrome_rejects_non_palindrome():
     assert is_palindrome("Fast API") is False
+
+@pytest.mark.parametrize(("celsius", "expected"), [(0, 32), (100, 212), (-40, -40)])
+def test_celsius_to_fahrenheit(celsius, expected):
+    assert celsius_to_fahrenheit(celsius) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize(("fahrenheit", "expected"), [(32, 0), (212, 100), (-40, -40)])
+def test_fahrenheit_to_celsius(fahrenheit, expected):
+    assert fahrenheit_to_celsius(fahrenheit) == pytest.approx(expected)
 
 def test_greet():
     assert greet("Alice") == "Hello, Alice!"
@@ -254,6 +264,39 @@ def test_palindrome_endpoint_for_non_palindrome():
     response = client.get("/palindrome", params={"text": "FastAPI"})
     assert response.status_code == 200
     assert response.json() == {"is_palindrome": False}
+
+def test_convert_temp_endpoint_calls_celsius_helper(monkeypatch):
+    calls = []
+
+    def tracked_conversion(value):
+        calls.append(value)
+        return 77.0
+
+    monkeypatch.setattr("src.app.celsius_to_fahrenheit", tracked_conversion)
+    response = client.get("/convert-temp?value=25&unit=C")
+    assert response.status_code == 200
+    assert response.json() == {"result": 77.0}
+    assert calls == [25.0]
+
+
+def test_convert_temp_endpoint_calls_fahrenheit_helper(monkeypatch):
+    calls = []
+
+    def tracked_conversion(value):
+        calls.append(value)
+        return 12.5
+
+    monkeypatch.setattr("src.app.fahrenheit_to_celsius", tracked_conversion)
+    response = client.get("/convert-temp?value=50&unit=F")
+    assert response.status_code == 200
+    assert response.json() == {"result": 12.5}
+    assert calls == [50.0]
+
+
+def test_convert_temp_endpoint_rejects_invalid_unit():
+    response = client.get("/convert-temp?value=25&unit=K")
+    assert response.status_code == 400
+    assert response.json() == {"detail": "unit must be 'C' or 'F'"}
 
 def test_greet_endpoint():
     response = client.get("/greet?name=Alice")

@@ -96,6 +96,13 @@ def is_palindrome(s: str) -> bool:
     normalized = s.lower().replace(" ", "")
     return normalized == reverse_string(normalized)
 
+def celsius_to_fahrenheit(c: int | float) -> float:
+    return c * 9 / 5 + 32
+
+
+def fahrenheit_to_celsius(f: int | float) -> float:
+    return (f - 32) * 5 / 9
+
 def greet(name: str) -> str:
     return f"Hello, {name}!"
 
@@ -183,6 +190,14 @@ def is_prime_endpoint(n: int = 0):
 @app.get("/palindrome")
 def palindrome_endpoint(text: str):
     return {"is_palindrome": is_palindrome(text)}
+
+@app.get("/convert-temp")
+def convert_temp_endpoint(value: float, unit: str):
+    if unit == "C":
+        return {"result": celsius_to_fahrenheit(value)}
+    if unit == "F":
+        return {"result": fahrenheit_to_celsius(value)}
+    raise HTTPException(status_code=400, detail="unit must be 'C' or 'F'")
 
 @app.get("/greet")
 def greet_endpoint(name: str):
