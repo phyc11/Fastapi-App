@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from src.app import add, app, average, divide, fibonacci, greet, increment, mean, median, modulo, multiply, power, stddev, subtract
+from src.app import add, app, average, divide, fibonacci, greet, increment, is_palindrome, is_prime, mean, median, modulo, multiply, power, reverse_string, stddev, subtract
 
 client = TestClient(app)
 
@@ -60,6 +60,40 @@ def test_stddev():
 def test_statistics_functions_reject_empty_lists(function):
     with pytest.raises(ValueError, match="numbers must not be empty"):
         function([])
+
+@pytest.mark.parametrize("n", [2, 3, 5, 11, 97])
+def test_is_prime_for_prime_numbers(n):
+    assert is_prime(n) is True
+
+
+@pytest.mark.parametrize("n", [4, 9, 25, 100])
+def test_is_prime_for_composite_numbers(n):
+    assert is_prime(n) is False
+
+
+@pytest.mark.parametrize("n", [-1, 0, 1])
+def test_is_prime_rejects_numbers_less_than_two(n):
+    with pytest.raises(ValueError, match="n must be at least 2"):
+        is_prime(n)
+
+def test_reverse_string():
+    assert reverse_string("FastAPI") == "IPAtsaF"
+
+
+def test_is_palindrome_calls_reverse_string(monkeypatch):
+    calls = []
+
+    def tracked_reverse_string(s):
+        calls.append(s)
+        return s[::-1]
+
+    monkeypatch.setattr("src.app.reverse_string", tracked_reverse_string)
+    assert is_palindrome("Never odd or even") is True
+    assert calls == ["neveroddoreven"]
+
+
+def test_is_palindrome_rejects_non_palindrome():
+    assert is_palindrome("Fast API") is False
 
 def test_greet():
     assert greet("Alice") == "Hello, Alice!"
@@ -151,6 +185,29 @@ def test_stats_endpoint_rejects_empty_or_invalid_numbers(numbers):
     response = client.get("/stats", params={"numbers": numbers})
     assert response.status_code == 400
     assert response.json()["detail"]
+
+@pytest.mark.parametrize(("n", "expected"), [(29, True), (49, False)])
+def test_is_prime_endpoint(n, expected):
+    response = client.get("/is-prime", params={"n": n})
+    assert response.status_code == 200
+    assert response.json() == {"is_prime": expected}
+
+
+def test_is_prime_endpoint_rejects_numbers_less_than_two():
+    response = client.get("/is-prime?n=1")
+    assert response.status_code == 400
+    assert response.json() == {"detail": "n must be at least 2"}
+
+def test_palindrome_endpoint():
+    response = client.get("/palindrome", params={"text": "Never odd or even"})
+    assert response.status_code == 200
+    assert response.json() == {"is_palindrome": True}
+
+
+def test_palindrome_endpoint_for_non_palindrome():
+    response = client.get("/palindrome", params={"text": "FastAPI"})
+    assert response.status_code == 200
+    assert response.json() == {"is_palindrome": False}
 
 def test_greet_endpoint():
     response = client.get("/greet?name=Alice")
