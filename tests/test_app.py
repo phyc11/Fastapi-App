@@ -1,13 +1,17 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from src.app import add, app, average, divide, greet, modulo, multiply, power, subtract
+from src.app import add, app, average, divide, greet, increment, modulo, multiply, power, subtract
 
 client = TestClient(app)
 
 
 def test_add():
     assert add(2, 3) == 5
+
+
+def test_increment():
+    assert increment(2) == 3
 
 
 def test_subtract():
@@ -56,6 +60,12 @@ def test_add_endpoint():
     response = client.get("/add?a=5&b=7")
     assert response.status_code == 200
     assert response.json() == {"result": 12}
+
+
+def test_increment_endpoint():
+    response = client.get("/increment?a=5")
+    assert response.status_code == 200
+    assert response.json() == {"result": 6}
 
 
 def test_subtract_endpoint():
