@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from src.app import add, app, average, divide, greet, increment, mean, median, modulo, multiply, power, stddev, subtract
+from src.app import add, app, average, divide, fibonacci, greet, increment, mean, median, modulo, multiply, power, stddev, subtract
 
 client = TestClient(app)
 
@@ -33,6 +33,15 @@ def test_modulo():
 def test_average():
     assert average(5, 8) == 6.5
 
+
+@pytest.mark.parametrize(("n", "expected"), [(0, 0), (1, 1), (10, 55)])
+def test_fibonacci(n, expected):
+    assert fibonacci(n) == expected
+
+
+def test_fibonacci_rejects_negative_n():
+    with pytest.raises(ValueError, match="n must be non-negative"):
+        fibonacci(-1)
 
 def test_mean():
     assert mean([1, 2, 3, 4]) == 2.5
@@ -115,6 +124,17 @@ def test_average_endpoint():
     assert response.status_code == 200
     assert response.json() == {"result": 6.5}
 
+
+def test_fibonacci_endpoint():
+    response = client.get("/fibonacci?n=10")
+    assert response.status_code == 200
+    assert response.json() == {"result": 55}
+
+
+def test_fibonacci_endpoint_rejects_negative_n():
+    response = client.get("/fibonacci?n=-1")
+    assert response.status_code == 400
+    assert response.json() == {"detail": "n must be non-negative"}
 
 def test_stats_endpoint():
     response = client.get("/stats?numbers=1,2,3")

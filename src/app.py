@@ -34,6 +34,15 @@ def average(a: int, b: int) -> float:
     return add(a, b) / 2
 
 
+def fibonacci(n: int) -> int:
+    if n < 0:
+        raise ValueError("n must be non-negative")
+
+    current, following = 0, 1
+    for _ in range(n):
+        current, following = following, current + following
+    return current
+
 def mean(numbers: list[int | float]) -> float:
     if not numbers:
         raise ValueError("numbers must not be empty")
@@ -105,6 +114,13 @@ def modulo_endpoint(a: int = 0, b: int = 0):
 def average_endpoint(a: int = 0, b: int = 0):
     return {"result": average(a, b)}
 
+
+@app.get("/fibonacci")
+def fibonacci_endpoint(n: int = 0):
+    try:
+        return {"result": fibonacci(n)}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 @app.get("/stats")
 def stats_endpoint(numbers: str = ""):
