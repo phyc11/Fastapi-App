@@ -1,5 +1,5 @@
 import os
-from math import isfinite, sqrt
+from math import isfinite, isqrt, sqrt
 from fastapi import FastAPI, HTTPException
 import uvicorn
 
@@ -64,6 +64,16 @@ def stddev(numbers: list[int | float]) -> float:
     average_value = mean(numbers)
     variance = sum((number - average_value) ** 2 for number in numbers) / len(numbers)
     return sqrt(variance)
+
+def is_prime(n: int) -> bool:
+    if n < 2:
+        raise ValueError("n must be at least 2")
+    if n == 2:
+        return True
+    if n % 2 == 0:
+        return False
+
+    return all(n % divisor != 0 for divisor in range(3, isqrt(n) + 1, 2))
 
 def reverse_string(s: str) -> str:
     return s[::-1]
@@ -143,6 +153,13 @@ def stats_endpoint(numbers: str = ""):
             "median": median(parsed_numbers),
             "stddev": stddev(parsed_numbers),
         }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+@app.get("/is-prime")
+def is_prime_endpoint(n: int = 0):
+    try:
+        return {"is_prime": is_prime(n)}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
