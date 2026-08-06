@@ -9,6 +9,10 @@ def add(a: int, b: int) -> int:
     return a + b
 
 
+def increment(a: int) -> int:
+    return a + 1
+
+
 def subtract(a: int, b: int) -> int:
     return a - b
 
@@ -47,6 +51,11 @@ def read_root():
 @app.get("/add")
 def add_endpoint(a: int = 0, b: int = 0):
     return {"result": add(a, b)}
+
+
+@app.get("/increment")
+def increment_endpoint(a: int = 0):
+    return {"result": increment(a)}
 
 
 @app.get("/subtract")
