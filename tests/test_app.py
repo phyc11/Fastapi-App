@@ -8,6 +8,7 @@ from src.app import (
     clamp,
     celsius_to_fahrenheit,
     divide,
+    factorial,
     fahrenheit_to_celsius,
     fibonacci,
     gcd,
@@ -192,6 +193,15 @@ def test_clamp_rejects_invalid_range():
         ValueError, match="min_value must be less than or equal to max_value"
     ):
         clamp(5, 10, 0)
+
+@pytest.mark.parametrize(("n", "expected"), [(0, 1), (1, 1), (5, 120), (10, 3628800)])
+def test_factorial(n, expected):
+    assert factorial(n) == expected
+
+
+def test_factorial_rejects_negative_n():
+    with pytest.raises(ValueError, match="n must be non-negative"):
+        factorial(-1)
 
 def test_greet():
     assert greet("Alice") == "Hello, Alice!"
@@ -416,6 +426,32 @@ def test_clamp_endpoint_rejects_invalid_range():
     assert response.json() == {
         "detail": "min_value must be less than or equal to max_value"
     }
+
+@pytest.mark.parametrize(("n", "expected"), [(0, 1), (5, 120)])
+def test_factorial_endpoint(n, expected):
+    response = client.get("/factorial", params={"n": n})
+    assert response.status_code == 200
+    assert response.json() == {"result": expected}
+
+
+def test_factorial_endpoint_calls_factorial(monkeypatch):
+    calls = []
+
+    def tracked_factorial(n):
+        calls.append(n)
+        return 99
+
+    monkeypatch.setattr("src.app.factorial", tracked_factorial)
+    response = client.get("/factorial?n=5")
+    assert response.status_code == 200
+    assert response.json() == {"result": 99}
+    assert calls == [5]
+
+
+def test_factorial_endpoint_rejects_negative_n():
+    response = client.get("/factorial?n=-1")
+    assert response.status_code == 400
+    assert response.json() == {"detail": "n must be non-negative"}
 
 def test_greet_endpoint():
     response = client.get("/greet?name=Alice")
