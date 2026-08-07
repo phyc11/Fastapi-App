@@ -27,6 +27,7 @@ from src.app import (
     sort_numbers,
     stddev,
     subtract,
+    word_count,
 )
 
 client = TestClient(app)
@@ -221,6 +222,19 @@ def test_reverse_list_does_not_mutate_input():
     items = [1, 2, 3]
     reverse_list(items)
     assert items == [1, 2, 3]
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("hello world", 2),
+        ("  hello   world  ", 2),
+        ("hello\tworld\nfrom FastAPI", 4),
+        ("", 0),
+        ("   \t\n", 0),
+    ],
+)
+def test_word_count(text, expected):
+    assert word_count(text) == expected
 
 def test_greet():
     assert greet("Alice") == "Hello, Alice!"
@@ -496,6 +510,32 @@ def test_reverse_list_endpoint_accepts_empty_items():
     response = client.get("/reverse-list?items=")
     assert response.status_code == 200
     assert response.json() == {"result": []}
+
+def test_word_count_endpoint():
+    response = client.get("/word-count", params={"text": "hello world from FastAPI"})
+    assert response.status_code == 200
+    assert response.json() == {"result": 4}
+
+
+def test_word_count_endpoint_calls_word_count(monkeypatch):
+    calls = []
+
+    def tracked_word_count(text):
+        calls.append(text)
+        return 99
+
+    monkeypatch.setattr("src.app.word_count", tracked_word_count)
+    response = client.get("/word-count", params={"text": "hello world"})
+    assert response.status_code == 200
+    assert response.json() == {"result": 99}
+    assert calls == ["hello world"]
+
+
+@pytest.mark.parametrize("text", ["", "   "])
+def test_word_count_endpoint_accepts_empty_or_whitespace_text(text):
+    response = client.get("/word-count", params={"text": text})
+    assert response.status_code == 200
+    assert response.json() == {"result": 0}
 
 def test_greet_endpoint():
     response = client.get("/greet?name=Alice")
