@@ -28,6 +28,7 @@ from src.app import (
     sort_numbers,
     stddev,
     subtract,
+    to_binary,
     word_count,
 )
 
@@ -243,6 +244,18 @@ def test_word_count(text, expected):
 )
 def test_is_leap_year(year, expected):
     assert is_leap_year(year) is expected
+
+@pytest.mark.parametrize(
+    ("n", "expected"),
+    [(0, "0"), (1, "1"), (2, "10"), (10, "1010"), (255, "11111111")],
+)
+def test_to_binary(n, expected):
+    assert to_binary(n) == expected
+
+
+def test_to_binary_rejects_negative_n():
+    with pytest.raises(ValueError, match="n must be non-negative"):
+        to_binary(-1)
 
 def test_greet():
     assert greet("Alice") == "Hello, Alice!"
@@ -567,6 +580,32 @@ def test_is_leap_year_endpoint_calls_helper(monkeypatch):
     assert response.status_code == 200
     assert response.json() == {"is_leap_year": True}
     assert calls == [2023]
+
+@pytest.mark.parametrize(("n", "expected"), [(0, "0"), (10, "1010")])
+def test_to_binary_endpoint(n, expected):
+    response = client.get("/to-binary", params={"n": n})
+    assert response.status_code == 200
+    assert response.json() == {"result": expected}
+
+
+def test_to_binary_endpoint_calls_helper(monkeypatch):
+    calls = []
+
+    def tracked_to_binary(n):
+        calls.append(n)
+        return "tracked"
+
+    monkeypatch.setattr("src.app.to_binary", tracked_to_binary)
+    response = client.get("/to-binary?n=10")
+    assert response.status_code == 200
+    assert response.json() == {"result": "tracked"}
+    assert calls == [10]
+
+
+def test_to_binary_endpoint_rejects_negative_n():
+    response = client.get("/to-binary?n=-1")
+    assert response.status_code == 400
+    assert response.json() == {"detail": "n must be non-negative"}
 
 def test_greet_endpoint():
     response = client.get("/greet?name=Alice")

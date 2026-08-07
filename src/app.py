@@ -148,6 +148,18 @@ def word_count(text: str) -> int:
 def is_leap_year(year: int) -> bool:
     return year % 400 == 0 or (year % 4 == 0 and year % 100 != 0)
 
+def to_binary(n: int) -> str:
+    if n < 0:
+        raise ValueError("n must be non-negative")
+    if n == 0:
+        return "0"
+
+    result = ""
+    while n:
+        result = str(n % 2) + result
+        n //= 2
+    return result
+
 def greet(name: str) -> str:
     return f"Hello, {name}!"
 
@@ -282,6 +294,13 @@ def word_count_endpoint(text: str = ""):
 @app.get("/is-leap-year")
 def is_leap_year_endpoint(year: int):
     return {"is_leap_year": is_leap_year(year)}
+
+@app.get("/to-binary")
+def to_binary_endpoint(n: int = 0):
+    try:
+        return {"result": to_binary(n)}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 @app.get("/greet")
 def greet_endpoint(name: str):
