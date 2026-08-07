@@ -145,6 +145,9 @@ def reverse_list(items: list) -> list:
 def word_count(text: str) -> int:
     return len(text.split())
 
+def is_leap_year(year: int) -> bool:
+    return year % 400 == 0 or (year % 4 == 0 and year % 100 != 0)
+
 def greet(name: str) -> str:
     return f"Hello, {name}!"
 
@@ -275,6 +278,10 @@ def reverse_list_endpoint(items: str = ""):
 @app.get("/word-count")
 def word_count_endpoint(text: str = ""):
     return {"result": word_count(text)}
+
+@app.get("/is-leap-year")
+def is_leap_year_endpoint(year: int):
+    return {"is_leap_year": is_leap_year(year)}
 
 @app.get("/greet")
 def greet_endpoint(name: str):

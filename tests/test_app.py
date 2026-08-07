@@ -14,6 +14,7 @@ from src.app import (
     gcd,
     greet,
     increment,
+    is_leap_year,
     is_palindrome,
     is_prime,
     lcm,
@@ -235,6 +236,13 @@ def test_reverse_list_does_not_mutate_input():
 )
 def test_word_count(text, expected):
     assert word_count(text) == expected
+
+@pytest.mark.parametrize(
+    ("year", "expected"),
+    [(2000, True), (2024, True), (1900, False), (2023, False), (2100, False)],
+)
+def test_is_leap_year(year, expected):
+    assert is_leap_year(year) is expected
 
 def test_greet():
     assert greet("Alice") == "Hello, Alice!"
@@ -536,6 +544,29 @@ def test_word_count_endpoint_accepts_empty_or_whitespace_text(text):
     response = client.get("/word-count", params={"text": text})
     assert response.status_code == 200
     assert response.json() == {"result": 0}
+
+@pytest.mark.parametrize(
+    ("year", "expected"),
+    [(2000, True), (2024, True), (1900, False), (2023, False)],
+)
+def test_is_leap_year_endpoint(year, expected):
+    response = client.get("/is-leap-year", params={"year": year})
+    assert response.status_code == 200
+    assert response.json() == {"is_leap_year": expected}
+
+
+def test_is_leap_year_endpoint_calls_helper(monkeypatch):
+    calls = []
+
+    def tracked_is_leap_year(year):
+        calls.append(year)
+        return True
+
+    monkeypatch.setattr("src.app.is_leap_year", tracked_is_leap_year)
+    response = client.get("/is-leap-year?year=2023")
+    assert response.status_code == 200
+    assert response.json() == {"is_leap_year": True}
+    assert calls == [2023]
 
 def test_greet_endpoint():
     response = client.get("/greet?name=Alice")
