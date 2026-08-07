@@ -22,6 +22,7 @@ from src.app import (
     modulo,
     multiply,
     power,
+    reverse_list,
     reverse_string,
     sort_numbers,
     stddev,
@@ -202,6 +203,24 @@ def test_factorial(n, expected):
 def test_factorial_rejects_negative_n():
     with pytest.raises(ValueError, match="n must be non-negative"):
         factorial(-1)
+
+@pytest.mark.parametrize(
+    ("items", "expected"),
+    [
+        ([1, 2, 3], [3, 2, 1]),
+        (["a", "b", "c"], ["c", "b", "a"]),
+        ([], []),
+        ([1], [1]),
+    ],
+)
+def test_reverse_list(items, expected):
+    assert reverse_list(items) == expected
+
+
+def test_reverse_list_does_not_mutate_input():
+    items = [1, 2, 3]
+    reverse_list(items)
+    assert items == [1, 2, 3]
 
 def test_greet():
     assert greet("Alice") == "Hello, Alice!"
@@ -452,6 +471,31 @@ def test_factorial_endpoint_rejects_negative_n():
     response = client.get("/factorial?n=-1")
     assert response.status_code == 400
     assert response.json() == {"detail": "n must be non-negative"}
+
+def test_reverse_list_endpoint():
+    response = client.get("/reverse-list", params={"items": "a,b,c"})
+    assert response.status_code == 200
+    assert response.json() == {"result": ["c", "b", "a"]}
+
+
+def test_reverse_list_endpoint_calls_reverse_list(monkeypatch):
+    calls = []
+
+    def tracked_reverse_list(items):
+        calls.append(items)
+        return ["tracked"]
+
+    monkeypatch.setattr("src.app.reverse_list", tracked_reverse_list)
+    response = client.get("/reverse-list", params={"items": "a, b, c"})
+    assert response.status_code == 200
+    assert response.json() == {"result": ["tracked"]}
+    assert calls == [["a", "b", "c"]]
+
+
+def test_reverse_list_endpoint_accepts_empty_items():
+    response = client.get("/reverse-list?items=")
+    assert response.status_code == 200
+    assert response.json() == {"result": []}
 
 def test_greet_endpoint():
     response = client.get("/greet?name=Alice")
