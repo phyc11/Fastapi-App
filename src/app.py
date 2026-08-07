@@ -127,6 +127,15 @@ def clamp(
         return max_value
     return value
 
+def factorial(n: int) -> int:
+    if n < 0:
+        raise ValueError("n must be non-negative")
+
+    result = 1
+    for factor in range(2, n + 1):
+        result *= factor
+    return result
+
 def greet(name: str) -> str:
     return f"Hello, {name}!"
 
@@ -239,6 +248,13 @@ def sort_endpoint(numbers: str = ""):
 def clamp_endpoint(value: float, min_value: float, max_value: float):
     try:
         return {"result": clamp(value, min_value, max_value)}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+@app.get("/factorial")
+def factorial_endpoint(n: int = 0):
+    try:
+        return {"result": factorial(n)}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
