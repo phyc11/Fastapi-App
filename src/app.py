@@ -136,6 +136,12 @@ def factorial(n: int) -> int:
         result *= factor
     return result
 
+def reverse_list(items: list) -> list:
+    result = []
+    for index in range(len(items) - 1, -1, -1):
+        result.append(items[index])
+    return result
+
 def greet(name: str) -> str:
     return f"Hello, {name}!"
 
@@ -257,6 +263,11 @@ def factorial_endpoint(n: int = 0):
         return {"result": factorial(n)}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+@app.get("/reverse-list")
+def reverse_list_endpoint(items: str = ""):
+    parsed_items = [] if not items else [item.strip() for item in items.split(",")]
+    return {"result": reverse_list(parsed_items)}
 
 @app.get("/greet")
 def greet_endpoint(name: str):
