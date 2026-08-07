@@ -142,6 +142,9 @@ def reverse_list(items: list) -> list:
         result.append(items[index])
     return result
 
+def word_count(text: str) -> int:
+    return len(text.split())
+
 def greet(name: str) -> str:
     return f"Hello, {name}!"
 
@@ -268,6 +271,10 @@ def factorial_endpoint(n: int = 0):
 def reverse_list_endpoint(items: str = ""):
     parsed_items = [] if not items else [item.strip() for item in items.split(",")]
     return {"result": reverse_list(parsed_items)}
+
+@app.get("/word-count")
+def word_count_endpoint(text: str = ""):
+    return {"result": word_count(text)}
 
 @app.get("/greet")
 def greet_endpoint(name: str):
