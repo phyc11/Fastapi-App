@@ -1,9 +1,22 @@
 import os
 from math import isfinite, isqrt, sqrt
-from fastapi import FastAPI, HTTPException
+from uuid import uuid4
+
 import uvicorn
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+
+from src.bank_account import BankAccount, account_registry
 
 app = FastAPI()
+
+
+class CreateAccountRequest(BaseModel):
+    initial_balance: float = 0
+
+
+class AccountTransactionRequest(BaseModel):
+    amount: float
 
 
 def add(a: int, b: int) -> int:
@@ -188,6 +201,50 @@ def power(a: int, b: int) -> int:
         raise ValueError("Exponent must be non-negative")
     return a ** b
 
+
+def _get_account(account_id: str) -> BankAccount:
+    account = account_registry.get(account_id)
+    if account is None:
+        raise HTTPException(status_code=404, detail="Account not found")
+    return account
+
+
+@app.post("/accounts")
+def create_account_endpoint(payload: CreateAccountRequest | None = None):
+    initial_balance = payload.initial_balance if payload is not None else 0
+    try:
+        account = BankAccount(initial_balance)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    account_id = uuid4().hex
+    account_registry[account_id] = account
+    return {"account_id": account_id}
+
+
+@app.post("/accounts/{account_id}/deposit")
+def deposit_endpoint(account_id: str, payload: AccountTransactionRequest):
+    account = _get_account(account_id)
+    try:
+        account.deposit(payload.amount)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"balance": account.get_balance()}
+
+
+@app.post("/accounts/{account_id}/withdraw")
+def withdraw_endpoint(account_id: str, payload: AccountTransactionRequest):
+    account = _get_account(account_id)
+    try:
+        account.withdraw(payload.amount)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"balance": account.get_balance()}
+
+
+@app.get("/accounts/{account_id}/balance")
+def balance_endpoint(account_id: str):
+    return {"balance": _get_account(account_id).get_balance()}
 
 @app.get("/")
 def read_root():
