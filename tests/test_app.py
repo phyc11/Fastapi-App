@@ -15,6 +15,7 @@ from src.app import (
     gcd,
     greet,
     increment,
+    is_anagram,
     is_leap_year,
     is_palindrome,
     is_prime,
@@ -269,6 +270,21 @@ def test_to_binary_rejects_negative_n():
 )
 def test_count_vowels(text, expected):
     assert count_vowels(text) == expected
+
+@pytest.mark.parametrize(
+    ("a", "b", "expected"),
+    [
+        ("listen", "silent", True),
+        ("Dormitory", "Dirty room", True),
+        ("A gentleman", "Elegant man", True),
+        ("aab", "abb", False),
+        ("hello", "world", False),
+        ("abc", "ab", False),
+        ("", "   ", True),
+    ],
+)
+def test_is_anagram(a, b, expected):
+    assert is_anagram(a, b) is expected
 
 def test_greet():
     assert greet("Alice") == "Hello, Alice!"
@@ -644,6 +660,29 @@ def test_count_vowels_endpoint_accepts_empty_text():
     response = client.get("/count-vowels?text=")
     assert response.status_code == 200
     assert response.json() == {"result": 0}
+
+@pytest.mark.parametrize(
+    ("a", "b", "expected"),
+    [("listen", "silent", True), ("hello", "world", False)],
+)
+def test_is_anagram_endpoint(a, b, expected):
+    response = client.get("/is-anagram", params={"a": a, "b": b})
+    assert response.status_code == 200
+    assert response.json() == {"is_anagram": expected}
+
+
+def test_is_anagram_endpoint_calls_helper(monkeypatch):
+    calls = []
+
+    def tracked_is_anagram(a, b):
+        calls.append((a, b))
+        return True
+
+    monkeypatch.setattr("src.app.is_anagram", tracked_is_anagram)
+    response = client.get("/is-anagram", params={"a": "hello", "b": "world"})
+    assert response.status_code == 200
+    assert response.json() == {"is_anagram": True}
+    assert calls == [("hello", "world")]
 
 def test_greet_endpoint():
     response = client.get("/greet?name=Alice")
