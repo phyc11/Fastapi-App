@@ -163,6 +163,22 @@ def to_binary(n: int) -> str:
 def count_vowels(text: str) -> int:
     return sum(character.lower() in "aeiou" for character in text)
 
+def is_anagram(a: str, b: str) -> bool:
+    normalized_a = a.lower().replace(" ", "")
+    normalized_b = b.lower().replace(" ", "")
+    if len(normalized_a) != len(normalized_b):
+        return False
+
+    frequencies = {}
+    for character in normalized_a:
+        frequencies[character] = frequencies.get(character, 0) + 1
+
+    for character in normalized_b:
+        if frequencies.get(character, 0) == 0:
+            return False
+        frequencies[character] -= 1
+    return True
+
 def greet(name: str) -> str:
     return f"Hello, {name}!"
 
@@ -308,6 +324,10 @@ def to_binary_endpoint(n: int = 0):
 @app.get("/count-vowels")
 def count_vowels_endpoint(text: str = ""):
     return {"result": count_vowels(text)}
+
+@app.get("/is-anagram")
+def is_anagram_endpoint(a: str, b: str):
+    return {"is_anagram": is_anagram(a, b)}
 
 @app.get("/greet")
 def greet_endpoint(name: str):
