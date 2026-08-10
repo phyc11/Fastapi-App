@@ -7,8 +7,15 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from src.bank_account import BankAccount, account_registry
+from src.library.book import Catalog
+from src.library.loan import LoanManager
+from src.library.member import MemberRegistry
 
 app = FastAPI()
+
+catalog = Catalog()
+member_registry = MemberRegistry()
+loan_manager = LoanManager(catalog, member_registry)
 
 
 class CreateAccountRequest(BaseModel):
@@ -17,6 +24,21 @@ class CreateAccountRequest(BaseModel):
 
 class AccountTransactionRequest(BaseModel):
     amount: float
+
+
+class AddBookRequest(BaseModel):
+    title: str
+    author: str
+
+
+class RegisterMemberRequest(BaseModel):
+    name: str
+    email: str
+
+
+class BorrowBookRequest(BaseModel):
+    book_id: str
+    member_id: str
 
 
 def add(a: int, b: int) -> int:
@@ -201,6 +223,56 @@ def power(a: int, b: int) -> int:
         raise ValueError("Exponent must be non-negative")
     return a ** b
 
+
+@app.post("/books")
+def add_book_endpoint(payload: AddBookRequest):
+    book_id = catalog.add_book(payload.title, payload.author)
+    return {"book_id": book_id}
+
+
+@app.get("/books")
+def list_books_endpoint():
+    return [
+        {
+            "book_id": book_id,
+            "title": book.title,
+            "author": book.author,
+            "is_borrowed": book.is_borrowed,
+        }
+        for book_id, book in catalog.books.items()
+    ]
+
+
+@app.post("/members")
+def register_member_endpoint(payload: RegisterMemberRequest):
+    member_id = member_registry.register(payload.name, payload.email)
+    return {"member_id": member_id}
+
+
+@app.get("/members/{member_id}")
+def get_member_endpoint(member_id: str):
+    member = member_registry.find_member(member_id)
+    if member is None:
+        raise HTTPException(status_code=404, detail="Member not found")
+    return {"name": member.name, "email": member.email}
+
+
+@app.post("/loans")
+def borrow_book_endpoint(payload: BorrowBookRequest):
+    try:
+        loan_id = loan_manager.borrow_book(payload.book_id, payload.member_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"loan_id": loan_id}
+
+
+@app.post("/loans/{loan_id}/return")
+def return_book_endpoint(loan_id: str):
+    try:
+        loan_manager.return_book(loan_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"status": "returned"}
 
 def _get_account(account_id: str) -> BankAccount:
     account = account_registry.get(account_id)
