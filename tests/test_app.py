@@ -7,6 +7,7 @@ from src.app import (
     average,
     clamp,
     celsius_to_fahrenheit,
+    count_vowels,
     divide,
     factorial,
     fahrenheit_to_celsius,
@@ -256,6 +257,18 @@ def test_to_binary(n, expected):
 def test_to_binary_rejects_negative_n():
     with pytest.raises(ValueError, match="n must be non-negative"):
         to_binary(-1)
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("Hello World", 3),
+        ("AEIOUaeiou", 10),
+        ("rhythms", 0),
+        ("", 0),
+    ],
+)
+def test_count_vowels(text, expected):
+    assert count_vowels(text) == expected
 
 def test_greet():
     assert greet("Alice") == "Hello, Alice!"
@@ -606,6 +619,31 @@ def test_to_binary_endpoint_rejects_negative_n():
     response = client.get("/to-binary?n=-1")
     assert response.status_code == 400
     assert response.json() == {"detail": "n must be non-negative"}
+
+def test_count_vowels_endpoint():
+    response = client.get("/count-vowels", params={"text": "Hello World"})
+    assert response.status_code == 200
+    assert response.json() == {"result": 3}
+
+
+def test_count_vowels_endpoint_calls_helper(monkeypatch):
+    calls = []
+
+    def tracked_count_vowels(text):
+        calls.append(text)
+        return 99
+
+    monkeypatch.setattr("src.app.count_vowels", tracked_count_vowels)
+    response = client.get("/count-vowels", params={"text": "Hello"})
+    assert response.status_code == 200
+    assert response.json() == {"result": 99}
+    assert calls == ["Hello"]
+
+
+def test_count_vowels_endpoint_accepts_empty_text():
+    response = client.get("/count-vowels?text=")
+    assert response.status_code == 200
+    assert response.json() == {"result": 0}
 
 def test_greet_endpoint():
     response = client.get("/greet?name=Alice")

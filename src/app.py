@@ -160,6 +160,9 @@ def to_binary(n: int) -> str:
         n //= 2
     return result
 
+def count_vowels(text: str) -> int:
+    return sum(character.lower() in "aeiou" for character in text)
+
 def greet(name: str) -> str:
     return f"Hello, {name}!"
 
@@ -301,6 +304,10 @@ def to_binary_endpoint(n: int = 0):
         return {"result": to_binary(n)}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+@app.get("/count-vowels")
+def count_vowels_endpoint(text: str = ""):
+    return {"result": count_vowels(text)}
 
 @app.get("/greet")
 def greet_endpoint(name: str):
