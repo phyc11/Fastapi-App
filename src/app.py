@@ -214,6 +214,17 @@ def is_anagram(a: str, b: str) -> bool:
         frequencies[character] -= 1
     return True
 
+def compound_interest(
+    principal: int | float,
+    rate: int | float,
+    years: int | float,
+) -> float:
+    if principal < 0:
+        raise ValueError("principal must be non-negative")
+    if years < 0:
+        raise ValueError("years must be non-negative")
+    return principal * (1 + rate) ** years
+
 def greet(name: str) -> str:
     return f"Hello, {name}!"
 
@@ -457,6 +468,13 @@ def count_vowels_endpoint(text: str = ""):
 @app.get("/is-anagram")
 def is_anagram_endpoint(a: str, b: str):
     return {"is_anagram": is_anagram(a, b)}
+
+@app.get("/compound-interest")
+def compound_interest_endpoint(principal: float, rate: float, years: float):
+    try:
+        return {"result": compound_interest(principal, rate, years)}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 @app.get("/greet")
 def greet_endpoint(name: str):

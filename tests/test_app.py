@@ -7,6 +7,7 @@ from src.app import (
     average,
     clamp,
     celsius_to_fahrenheit,
+    compound_interest,
     count_vowels,
     divide,
     factorial,
@@ -285,6 +286,32 @@ def test_count_vowels(text, expected):
 )
 def test_is_anagram(a, b, expected):
     assert is_anagram(a, b) is expected
+
+@pytest.mark.parametrize(
+    ("principal", "rate", "years", "expected"),
+    [
+        (1000, 0.05, 2, 1102.5),
+        (1000, 0.05, 0, 1000),
+        (0, 0.10, 10, 0),
+        (100, -0.10, 2, 81),
+    ],
+)
+def test_compound_interest(principal, rate, years, expected):
+    assert compound_interest(principal, rate, years) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize(
+    ("principal", "rate", "years", "message"),
+    [
+        (-1, 0.05, 2, "principal must be non-negative"),
+        (1000, 0.05, -1, "years must be non-negative"),
+    ],
+)
+def test_compound_interest_rejects_negative_input(
+    principal, rate, years, message
+):
+    with pytest.raises(ValueError, match=message):
+        compound_interest(principal, rate, years)
 
 def test_greet():
     assert greet("Alice") == "Hello, Alice!"
@@ -683,6 +710,49 @@ def test_is_anagram_endpoint_calls_helper(monkeypatch):
     assert response.status_code == 200
     assert response.json() == {"is_anagram": True}
     assert calls == [("hello", "world")]
+
+def test_compound_interest_endpoint():
+    response = client.get(
+        "/compound-interest",
+        params={"principal": 1000, "rate": 0.05, "years": 2},
+    )
+    assert response.status_code == 200
+    assert response.json()["result"] == pytest.approx(1102.5)
+
+
+def test_compound_interest_endpoint_calls_helper(monkeypatch):
+    calls = []
+
+    def tracked_compound_interest(principal, rate, years):
+        calls.append((principal, rate, years))
+        return 99.0
+
+    monkeypatch.setattr("src.app.compound_interest", tracked_compound_interest)
+    response = client.get(
+        "/compound-interest",
+        params={"principal": 1000, "rate": 0.05, "years": 2},
+    )
+    assert response.status_code == 200
+    assert response.json() == {"result": 99.0}
+    assert calls == [(1000.0, 0.05, 2.0)]
+
+
+@pytest.mark.parametrize(
+    ("principal", "years", "message"),
+    [
+        (-1, 2, "principal must be non-negative"),
+        (1000, -1, "years must be non-negative"),
+    ],
+)
+def test_compound_interest_endpoint_rejects_negative_input(
+    principal, years, message
+):
+    response = client.get(
+        "/compound-interest",
+        params={"principal": principal, "rate": 0.05, "years": years},
+    )
+    assert response.status_code == 400
+    assert response.json() == {"detail": message}
 
 def test_greet_endpoint():
     response = client.get("/greet?name=Alice")
