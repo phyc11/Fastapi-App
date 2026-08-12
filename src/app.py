@@ -267,6 +267,23 @@ def compound_interest(
         raise ValueError("years must be non-negative")
     return principal * (1 + rate) ** years
 
+def calculate_bmi(weight: int | float, height: int | float) -> float:
+    if not isfinite(weight) or weight <= 0:
+        raise ValueError("weight must be a positive finite number")
+    if not isfinite(height) or height <= 0:
+        raise ValueError("height must be a positive finite number")
+    return weight / height**2
+
+
+def classify_bmi(bmi_value: int | float) -> str:
+    if bmi_value < 18.5:
+        return "underweight"
+    if bmi_value < 25:
+        return "normal"
+    if bmi_value < 30:
+        return "overweight"
+    return "obese"
+
 def greet(name: str) -> str:
     return f"Hello, {name}!"
 
@@ -693,6 +710,14 @@ def compound_interest_endpoint(principal: float, rate: float, years: float):
         return {"result": compound_interest(principal, rate, years)}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+@app.get("/bmi")
+def bmi_endpoint(weight: float, height: float):
+    try:
+        bmi_value = calculate_bmi(weight, height)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"bmi": round(bmi_value, 2), "category": classify_bmi(bmi_value)}
 
 @app.get("/greet")
 def greet_endpoint(name: str):

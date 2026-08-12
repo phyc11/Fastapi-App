@@ -5,8 +5,10 @@ from src.app import (
     add,
     app,
     average,
+    calculate_bmi,
     clamp,
     celsius_to_fahrenheit,
+    classify_bmi,
     compound_interest,
     count_vowels,
     divide,
@@ -312,6 +314,38 @@ def test_compound_interest_rejects_negative_input(
 ):
     with pytest.raises(ValueError, match=message):
         compound_interest(principal, rate, years)
+
+def test_calculate_bmi():
+    assert calculate_bmi(70, 1.75) == pytest.approx(70 / 1.75**2)
+
+
+@pytest.mark.parametrize(
+    ("weight", "height", "message"),
+    [
+        (0, 1.75, "weight must be a positive finite number"),
+        (-1, 1.75, "weight must be a positive finite number"),
+        (70, 0, "height must be a positive finite number"),
+        (70, -1, "height must be a positive finite number"),
+    ],
+)
+def test_calculate_bmi_rejects_invalid_input(weight, height, message):
+    with pytest.raises(ValueError, match=message):
+        calculate_bmi(weight, height)
+
+
+@pytest.mark.parametrize(
+    ("bmi_value", "expected"),
+    [
+        (18.49, "underweight"),
+        (18.5, "normal"),
+        (24.99, "normal"),
+        (25, "overweight"),
+        (29.99, "overweight"),
+        (30, "obese"),
+    ],
+)
+def test_classify_bmi(bmi_value, expected):
+    assert classify_bmi(bmi_value) == expected
 
 def test_greet():
     assert greet("Alice") == "Hello, Alice!"
@@ -750,6 +784,45 @@ def test_compound_interest_endpoint_rejects_negative_input(
     response = client.get(
         "/compound-interest",
         params={"principal": principal, "rate": 0.05, "years": years},
+    )
+    assert response.status_code == 400
+    assert response.json() == {"detail": message}
+
+def test_bmi_endpoint():
+    response = client.get("/bmi?weight=70&height=1.75")
+    assert response.status_code == 200
+    assert response.json() == {"bmi": 22.86, "category": "normal"}
+
+
+def test_bmi_endpoint_calls_helpers(monkeypatch):
+    calls = []
+
+    def tracked_calculate(weight, height):
+        calls.append(("calculate", weight, height))
+        return 27.5
+
+    def tracked_classify(bmi_value):
+        calls.append(("classify", bmi_value))
+        return "tracked"
+
+    monkeypatch.setattr("src.app.calculate_bmi", tracked_calculate)
+    monkeypatch.setattr("src.app.classify_bmi", tracked_classify)
+    response = client.get("/bmi?weight=70&height=1.75")
+    assert response.status_code == 200
+    assert response.json() == {"bmi": 27.5, "category": "tracked"}
+    assert calls == [("calculate", 70.0, 1.75), ("classify", 27.5)]
+
+
+@pytest.mark.parametrize(
+    ("weight", "height", "message"),
+    [
+        (0, 1.75, "weight must be a positive finite number"),
+        (70, 0, "height must be a positive finite number"),
+    ],
+)
+def test_bmi_endpoint_rejects_invalid_input(weight, height, message):
+    response = client.get(
+        "/bmi", params={"weight": weight, "height": height}
     )
     assert response.status_code == 400
     assert response.json() == {"detail": message}
