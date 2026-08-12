@@ -7,6 +7,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from src.bank_account import BankAccount, account_registry
+from src.inventory.manager import InventoryManager
 from src.library.book import Catalog
 from src.library.loan import LoanManager
 from src.library.member import MemberRegistry
@@ -16,6 +17,7 @@ from src.shop.order import OrderManager
 
 app = FastAPI()
 
+inventory_manager = InventoryManager()
 catalog = Catalog()
 member_registry = MemberRegistry()
 loan_manager = LoanManager(catalog, member_registry)
@@ -51,6 +53,15 @@ class CreateProductRequest(BaseModel):
     name: str
     price: float
     stock: int
+
+
+class CreateInventoryProductRequest(BaseModel):
+    name: str
+    initial_stock: int = 0
+
+
+class StockMovementRequest(BaseModel):
+    quantity: int
 
 
 class AddCartItemRequest(BaseModel):
@@ -255,6 +266,65 @@ def power(a: int, b: int) -> int:
         raise ValueError("Exponent must be non-negative")
     return a ** b
 
+
+def _serialize_inventory_product(product_id, product):
+    return {
+        "product_id": product_id,
+        "name": product.name,
+        "stock": product.stock,
+        "history": [
+            {
+                "movement_id": movement.movement_id,
+                "type": movement.movement_type,
+                "quantity": movement.quantity,
+                "stock_after": movement.stock_after,
+                "created_at": movement.created_at.isoformat(),
+            }
+            for movement in product.history
+        ],
+    }
+
+
+@app.post("/inventory/products")
+def create_inventory_product_endpoint(payload: CreateInventoryProductRequest):
+    try:
+        product_id = inventory_manager.add_product(
+            payload.name, payload.initial_stock
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    product = inventory_manager.find_product(product_id)
+    return _serialize_inventory_product(product_id, product)
+
+
+@app.post("/inventory/{product_id}/stock-in")
+def stock_in_endpoint(product_id: str, payload: StockMovementRequest):
+    try:
+        product = inventory_manager.stock_in(product_id, payload.quantity)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=exc.args[0]) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _serialize_inventory_product(product_id, product)
+
+
+@app.post("/inventory/{product_id}/stock-out")
+def stock_out_endpoint(product_id: str, payload: StockMovementRequest):
+    try:
+        product = inventory_manager.stock_out(product_id, payload.quantity)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=exc.args[0]) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _serialize_inventory_product(product_id, product)
+
+
+@app.get("/inventory")
+def list_inventory_endpoint():
+    return [
+        _serialize_inventory_product(product_id, product)
+        for product_id, product in inventory_manager.products.items()
+    ]
 
 def _serialize_cart(cart):
     items = []
