@@ -15,6 +15,7 @@ from src.inventory.manager import InventoryManager
 from src.library.book import Catalog
 from src.library.loan import LoanManager
 from src.library.member import MemberRegistry
+from src.notifications.service import Notification, NotificationService
 from src.shop.cart import CartRegistry
 from src.shop.catalog import ProductCatalog
 from src.shop.order import OrderManager
@@ -22,6 +23,7 @@ from src.shop.order import OrderManager
 app = FastAPI()
 
 auth_service = AuthService()
+notification_service = NotificationService()
 bearer_scheme = HTTPBearer(auto_error=False)
 
 inventory_manager = InventoryManager()
@@ -42,6 +44,11 @@ class RegisterUserRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+
+class CreateNotificationRequest(BaseModel):
+    type: str
+    message: str
 
 
 class CreateAccountRequest(BaseModel):
@@ -310,6 +317,17 @@ def power(a: int, b: int) -> int:
     return a ** b
 
 
+def _serialize_notification(notification: Notification):
+    return {
+        "notification_id": notification.notification_id,
+        "type": notification.notification_type,
+        "message": notification.message,
+        "status": notification.status,
+        "created_at": notification.created_at.isoformat(),
+        "updated_at": notification.updated_at.isoformat(),
+    }
+
+
 def _serialize_user(user: User):
     return {"user_id": user.user_id, "name": user.name, "email": user.email}
 
@@ -332,6 +350,45 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
 
+
+@app.post("/notifications", status_code=201)
+def create_notification_endpoint(
+    payload: CreateNotificationRequest,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        notification = notification_service.create(
+            current_user.user_id, payload.type, payload.message
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _serialize_notification(notification)
+
+
+@app.get("/notifications/me")
+def list_my_notifications_endpoint(
+    current_user: User = Depends(get_current_user),
+):
+    return [
+        _serialize_notification(notification)
+        for notification in notification_service.list_for_user(
+            current_user.user_id
+        )
+    ]
+
+
+@app.patch("/notifications/{notification_id}/read")
+def mark_notification_read_endpoint(
+    notification_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        notification = notification_service.mark_read(
+            notification_id, current_user.user_id
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=exc.args[0]) from exc
+    return _serialize_notification(notification)
 
 @app.post("/auth/register", status_code=201)
 def register_user_endpoint(payload: RegisterUserRequest):
