@@ -4,7 +4,7 @@ from math import isfinite, isqrt, sqrt
 from uuid import uuid4
 
 import uvicorn
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, UploadFile
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
@@ -19,11 +19,13 @@ from src.notifications.service import Notification, NotificationService
 from src.shop.cart import CartRegistry
 from src.shop.catalog import ProductCatalog
 from src.shop.order import OrderManager
+from src.uploads.service import ImageStorage, StoredImage
 
 app = FastAPI()
 
 auth_service = AuthService()
 notification_service = NotificationService()
+image_storage = ImageStorage()
 bearer_scheme = HTTPBearer(auto_error=False)
 
 inventory_manager = InventoryManager()
@@ -317,21 +319,6 @@ def power(a: int, b: int) -> int:
     return a ** b
 
 
-def _serialize_notification(notification: Notification):
-    return {
-        "notification_id": notification.notification_id,
-        "type": notification.notification_type,
-        "message": notification.message,
-        "status": notification.status,
-        "created_at": notification.created_at.isoformat(),
-        "updated_at": notification.updated_at.isoformat(),
-    }
-
-
-def _serialize_user(user: User):
-    return {"user_id": user.user_id, "name": user.name, "email": user.email}
-
-
 def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> User:
@@ -349,6 +336,96 @@ def get_current_user(
             detail=str(exc),
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
+
+def _serialize_image(image: StoredImage):
+    result = {
+        "image_id": image.image_id,
+        "filename": image.filename,
+        "content_type": image.content_type,
+        "size": image.size,
+        "created_at": image.created_at.isoformat(),
+    }
+    if image.product_id is not None:
+        result["product_id"] = image.product_id
+    return result
+
+
+async def _read_upload(file: UploadFile) -> bytes:
+    content = await file.read()
+    await file.close()
+    return content
+
+
+@app.post("/users/me/avatar", status_code=201)
+async def upload_avatar_endpoint(
+    file: UploadFile,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        image = image_storage.save_avatar(
+            current_user.user_id,
+            file.filename or "avatar",
+            file.content_type or "",
+            await _read_upload(file),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _serialize_image(image)
+
+
+@app.post("/products/{product_id}/images", status_code=201)
+async def upload_product_image_endpoint(
+    product_id: str,
+    file: UploadFile,
+    current_user: User = Depends(get_current_user),
+):
+    if product_catalog.find_product(product_id) is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    try:
+        image = image_storage.save_product_image(
+            product_id,
+            current_user.user_id,
+            file.filename or "product-image",
+            file.content_type or "",
+            await _read_upload(file),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _serialize_image(image)
+
+
+@app.delete("/products/{product_id}/images/{image_id}", status_code=204)
+def delete_product_image_endpoint(
+    product_id: str,
+    image_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    if product_catalog.find_product(product_id) is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    try:
+        image_storage.delete_product_image(
+            product_id, image_id, current_user.user_id
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=exc.args[0]) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+
+def _serialize_notification(notification: Notification):
+    return {
+        "notification_id": notification.notification_id,
+        "type": notification.notification_type,
+        "message": notification.message,
+        "status": notification.status,
+        "created_at": notification.created_at.isoformat(),
+        "updated_at": notification.updated_at.isoformat(),
+    }
+
+
+def _serialize_user(user: User):
+    return {"user_id": user.user_id, "name": user.name, "email": user.email}
+
 
 
 @app.post("/notifications", status_code=201)
