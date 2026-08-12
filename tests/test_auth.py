@@ -18,7 +18,7 @@ def clear_users():
 
 
 def test_register_hashes_password_and_normalizes_email():
-    service = AuthService(secret="test-secret")
+    service = AuthService(secret="test-secret-that-is-at-least-32-bytes")
     user = service.register(" Alice ", " Alice@Example.COM ", "password123")
 
     assert user.name == "Alice"
@@ -42,20 +42,20 @@ def test_register_hashes_password_and_normalizes_email():
     ],
 )
 def test_register_validates_user(name, email, password, message):
-    service = AuthService(secret="test-secret")
+    service = AuthService(secret="test-secret-that-is-at-least-32-bytes")
     with pytest.raises(ValueError, match=message):
         service.register(name, email, password)
 
 
 def test_register_rejects_duplicate_email_case_insensitively():
-    service = AuthService(secret="test-secret")
+    service = AuthService(secret="test-secret-that-is-at-least-32-bytes")
     service.register("Alice", "alice@example.com", "password123")
     with pytest.raises(ValueError, match="email is already registered"):
         service.register("Other", "ALICE@example.com", "password456")
 
 
 def test_authenticate_accepts_valid_credentials():
-    service = AuthService(secret="test-secret")
+    service = AuthService(secret="test-secret-that-is-at-least-32-bytes")
     registered = service.register(
         "Alice", "alice@example.com", "password123"
     )
@@ -73,18 +73,18 @@ def test_authenticate_accepts_valid_credentials():
     ],
 )
 def test_authenticate_rejects_invalid_credentials(email, password):
-    service = AuthService(secret="test-secret")
+    service = AuthService(secret="test-secret-that-is-at-least-32-bytes")
     service.register("Alice", "alice@example.com", "password123")
     with pytest.raises(ValueError, match="invalid email or password"):
         service.authenticate(email, password)
 
 
 def test_access_token_round_trip():
-    service = AuthService(secret="test-secret")
+    service = AuthService(secret="test-secret-that-is-at-least-32-bytes")
     user = service.register("Alice", "alice@example.com", "password123")
     token = service.create_access_token(user)
 
-    payload = jwt.decode(token, "test-secret", algorithms=["HS256"])
+    payload = jwt.decode(token, "test-secret-that-is-at-least-32-bytes", algorithms=["HS256"])
     assert payload["sub"] == user.user_id
     assert "iat" in payload
     assert "exp" in payload
@@ -92,13 +92,13 @@ def test_access_token_round_trip():
 
 
 def test_expired_or_tampered_token_is_rejected():
-    service = AuthService(secret="test-secret", access_token_minutes=-1)
+    service = AuthService(secret="test-secret-that-is-at-least-32-bytes", access_token_minutes=-1)
     user = service.register("Alice", "alice@example.com", "password123")
     with pytest.raises(ValueError, match="invalid or expired access token"):
         service.get_user_from_token(service.create_access_token(user))
 
-    other_service = AuthService(secret="other-secret")
-    valid_service = AuthService(secret="test-secret")
+    other_service = AuthService(secret="other-secret-that-is-at-least-32-bytes")
+    valid_service = AuthService(secret="test-secret-that-is-at-least-32-bytes")
     other_user = other_service.register(
         "Alice", "alice@example.com", "password123"
     )
