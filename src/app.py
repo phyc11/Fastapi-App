@@ -1,4 +1,5 @@
 import os
+from datetime import date
 from math import isfinite, isqrt, sqrt
 from uuid import uuid4
 
@@ -7,6 +8,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from src.bank_account import BankAccount, account_registry
+from src.expense_tracker.tracker import ExpenseTracker
 from src.inventory.manager import InventoryManager
 from src.library.book import Catalog
 from src.library.loan import LoanManager
@@ -71,6 +73,14 @@ class AddCartItemRequest(BaseModel):
 
 class CreateOrderRequest(BaseModel):
     cart_id: str
+
+
+class CreateTransactionRequest(BaseModel):
+    type: str
+    amount: float
+    category: str
+    occurred_on: date | None = None
+    description: str = ""
 
 
 def add(a: int, b: int) -> int:
@@ -266,6 +276,53 @@ def power(a: int, b: int) -> int:
         raise ValueError("Exponent must be non-negative")
     return a ** b
 
+
+expense_tracker = ExpenseTracker(mean, sort_numbers)
+
+
+def _serialize_transaction(transaction_id, transaction):
+    return {
+        "transaction_id": transaction_id,
+        "type": transaction.transaction_type,
+        "amount": transaction.amount,
+        "category": transaction.category,
+        "occurred_on": transaction.occurred_on.isoformat(),
+        "description": transaction.description,
+    }
+
+
+@app.post("/transactions")
+def create_transaction_endpoint(payload: CreateTransactionRequest):
+    try:
+        transaction_id = expense_tracker.add_transaction(
+            payload.type,
+            payload.amount,
+            payload.category,
+            payload.occurred_on or date.today(),
+            payload.description,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    transaction = expense_tracker.transactions[transaction_id]
+    return _serialize_transaction(transaction_id, transaction)
+
+
+@app.get("/transactions")
+def list_transactions_endpoint():
+    return [
+        _serialize_transaction(transaction_id, transaction)
+        for transaction_id, transaction in expense_tracker.list_transactions()
+    ]
+
+
+@app.get("/reports/monthly")
+def monthly_report_endpoint():
+    return expense_tracker.monthly_report()
+
+
+@app.get("/reports/categories")
+def category_report_endpoint():
+    return expense_tracker.category_report()
 
 def _serialize_inventory_product(product_id, product):
     return {
