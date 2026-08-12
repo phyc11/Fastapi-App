@@ -4,9 +4,11 @@ from math import isfinite, isqrt, sqrt
 from uuid import uuid4
 
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
+from src.auth.service import AuthService, User
 from src.bank_account import BankAccount, account_registry
 from src.expense_tracker.tracker import ExpenseTracker
 from src.inventory.manager import InventoryManager
@@ -19,6 +21,9 @@ from src.shop.order import OrderManager
 
 app = FastAPI()
 
+auth_service = AuthService()
+bearer_scheme = HTTPBearer(auto_error=False)
+
 inventory_manager = InventoryManager()
 catalog = Catalog()
 member_registry = MemberRegistry()
@@ -26,6 +31,17 @@ loan_manager = LoanManager(catalog, member_registry)
 product_catalog = ProductCatalog()
 cart_registry = CartRegistry(product_catalog)
 order_manager = OrderManager(product_catalog, cart_registry)
+
+
+class RegisterUserRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
 
 
 class CreateAccountRequest(BaseModel):
@@ -292,6 +308,55 @@ def power(a: int, b: int) -> int:
     if b < 0:
         raise ValueError("Exponent must be non-negative")
     return a ** b
+
+
+def _serialize_user(user: User):
+    return {"user_id": user.user_id, "name": user.name, "email": user.email}
+
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> User:
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        raise HTTPException(
+            status_code=401,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    try:
+        return auth_service.get_user_from_token(credentials.credentials)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=401,
+            detail=str(exc),
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
+
+
+@app.post("/auth/register", status_code=201)
+def register_user_endpoint(payload: RegisterUserRequest):
+    try:
+        user = auth_service.register(payload.name, payload.email, payload.password)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _serialize_user(user)
+
+
+@app.post("/auth/login")
+def login_endpoint(payload: LoginRequest):
+    try:
+        user = auth_service.authenticate(payload.email, payload.password)
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    return {
+        "access_token": auth_service.create_access_token(user),
+        "token_type": "bearer",
+    }
+
+
+@app.get("/users/me")
+def get_current_user_endpoint(current_user: User = Depends(get_current_user)):
+    return _serialize_user(current_user)
 
 
 expense_tracker = ExpenseTracker(mean, sort_numbers)

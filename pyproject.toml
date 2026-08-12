@@ -3,7 +3,9 @@ name = "my-python-ci"
 version = "0.1.0"
 dependencies = [
     "fastapi",
-    "uvicorn"
+    "pwdlib[argon2]>=0.3.0",
+    "pyjwt>=2.13.0",
+    "uvicorn",
 ]
 
 [project.optional-dependencies]
