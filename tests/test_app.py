@@ -4,7 +4,6 @@ from fastapi.testclient import TestClient
 from src.app import (
     add,
     app,
-    array_max,
     average,
     clamp,
     celsius_to_fahrenheit,
@@ -313,23 +312,6 @@ def test_compound_interest_rejects_negative_input(
 ):
     with pytest.raises(ValueError, match=message):
         compound_interest(principal, rate, years)
-
-@pytest.mark.parametrize(
-    ("numbers", "expected"),
-    [
-        ([3, 1, 2], 3),
-        ([-5, -1, -10], -1),
-        ([2.5, 7.25, 7.0], 7.25),
-        ([4], 4),
-    ],
-)
-def test_array_max(numbers, expected):
-    assert array_max(numbers) == expected
-
-
-def test_array_max_rejects_empty_list():
-    with pytest.raises(ValueError, match="numbers must not be empty"):
-        array_max([])
 
 def test_greet():
     assert greet("Alice") == "Hello, Alice!"
@@ -771,32 +753,6 @@ def test_compound_interest_endpoint_rejects_negative_input(
     )
     assert response.status_code == 400
     assert response.json() == {"detail": message}
-
-def test_array_max_endpoint():
-    response = client.get("/array-max?numbers=3,1,2")
-    assert response.status_code == 200
-    assert response.json() == {"result": 3.0}
-
-
-def test_array_max_endpoint_calls_helper(monkeypatch):
-    calls = []
-
-    def tracked_array_max(numbers):
-        calls.append(numbers)
-        return 99.0
-
-    monkeypatch.setattr("src.app.array_max", tracked_array_max)
-    response = client.get("/array-max?numbers=3,1,2")
-    assert response.status_code == 200
-    assert response.json() == {"result": 99.0}
-    assert calls == [[3.0, 1.0, 2.0]]
-
-
-@pytest.mark.parametrize("numbers", ["", "3,two,1", "3,,1"])
-def test_array_max_endpoint_rejects_empty_or_invalid_numbers(numbers):
-    response = client.get("/array-max", params={"numbers": numbers})
-    assert response.status_code == 400
-    assert response.json()["detail"]
 
 def test_greet_endpoint():
     response = client.get("/greet?name=Alice")

@@ -225,16 +225,6 @@ def compound_interest(
         raise ValueError("years must be non-negative")
     return principal * (1 + rate) ** years
 
-def array_max(numbers: list[int | float]) -> int | float:
-    if not numbers:
-        raise ValueError("numbers must not be empty")
-
-    largest = numbers[0]
-    for index in range(1, len(numbers)):
-        if numbers[index] > largest:
-            largest = numbers[index]
-    return largest
-
 def greet(name: str) -> str:
     return f"Hello, {name}!"
 
@@ -483,18 +473,6 @@ def is_anagram_endpoint(a: str, b: str):
 def compound_interest_endpoint(principal: float, rate: float, years: float):
     try:
         return {"result": compound_interest(principal, rate, years)}
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-@app.get("/array-max")
-def array_max_endpoint(numbers: str = ""):
-    try:
-        if not numbers.strip():
-            raise ValueError("numbers must not be empty")
-        parsed_numbers = [float(value.strip()) for value in numbers.split(",")]
-        if not all(isfinite(number) for number in parsed_numbers):
-            raise ValueError("numbers must contain only finite numeric values")
-        return {"result": array_max(parsed_numbers)}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
