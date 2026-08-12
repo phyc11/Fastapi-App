@@ -10,12 +10,18 @@ from src.bank_account import BankAccount, account_registry
 from src.library.book import Catalog
 from src.library.loan import LoanManager
 from src.library.member import MemberRegistry
+from src.shop.cart import CartRegistry
+from src.shop.catalog import ProductCatalog
+from src.shop.order import OrderManager
 
 app = FastAPI()
 
 catalog = Catalog()
 member_registry = MemberRegistry()
 loan_manager = LoanManager(catalog, member_registry)
+product_catalog = ProductCatalog()
+cart_registry = CartRegistry(product_catalog)
+order_manager = OrderManager(product_catalog, cart_registry)
 
 
 class CreateAccountRequest(BaseModel):
@@ -39,6 +45,21 @@ class RegisterMemberRequest(BaseModel):
 class BorrowBookRequest(BaseModel):
     book_id: str
     member_id: str
+
+
+class CreateProductRequest(BaseModel):
+    name: str
+    price: float
+    stock: int
+
+
+class AddCartItemRequest(BaseModel):
+    product_id: str
+    quantity: int
+
+
+class CreateOrderRequest(BaseModel):
+    cart_id: str
 
 
 def add(a: int, b: int) -> int:
@@ -234,6 +255,76 @@ def power(a: int, b: int) -> int:
         raise ValueError("Exponent must be non-negative")
     return a ** b
 
+
+def _serialize_cart(cart):
+    items = []
+    for product_id, quantity in cart.items.items():
+        product = product_catalog.find_product(product_id)
+        if product is None:
+            continue
+        items.append(
+            {
+                "product_id": product_id,
+                "name": product.name,
+                "price": product.price,
+                "quantity": quantity,
+                "subtotal": product.price * quantity,
+            }
+        )
+    return {
+        "cart_id": cart.cart_id,
+        "items": items,
+        "total": cart_registry.total(cart),
+        "is_checked_out": cart.is_checked_out,
+    }
+
+
+@app.post("/products")
+def create_product_endpoint(payload: CreateProductRequest):
+    try:
+        product_id = product_catalog.add_product(
+            payload.name, payload.price, payload.stock
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"product_id": product_id}
+
+
+@app.post("/carts/{cart_id}/items")
+def add_cart_item_endpoint(cart_id: str, payload: AddCartItemRequest):
+    try:
+        cart = cart_registry.add_item(
+            cart_id, payload.product_id, payload.quantity
+        )
+        return _serialize_cart(cart)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.delete("/carts/{cart_id}/items/{product_id}")
+def remove_cart_item_endpoint(cart_id: str, product_id: str):
+    try:
+        return _serialize_cart(cart_registry.remove_item(cart_id, product_id))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/carts/{cart_id}")
+def get_cart_endpoint(cart_id: str):
+    cart = cart_registry.find_cart(cart_id)
+    if cart is None:
+        raise HTTPException(status_code=404, detail="Cart not found")
+    return _serialize_cart(cart)
+
+
+@app.post("/orders")
+def create_order_endpoint(payload: CreateOrderRequest):
+    try:
+        order_id = order_manager.create_order(payload.cart_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    order = order_manager.find_order(order_id)
+    return {"order_id": order_id, "total": order.total}
 
 @app.post("/books")
 def add_book_endpoint(payload: AddBookRequest):
