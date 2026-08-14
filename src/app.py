@@ -100,10 +100,6 @@ class CreateOrderRequest(BaseModel):
     cart_id: str
 
 
-class UpdateOrderStatusRequest(BaseModel):
-    status: str
-
-
 class CreateTransactionRequest(BaseModel):
     type: str
     amount: float
@@ -340,15 +336,6 @@ def get_current_user(
             detail=str(exc),
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
-
-
-def get_optional_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-) -> User | None:
-    if credentials is None:
-        return None
-    return get_current_user(credentials)
-
 
 def _serialize_image(image: StoredImage):
     result = {
@@ -673,71 +660,14 @@ def get_cart_endpoint(cart_id: str):
     return _serialize_cart(cart)
 
 
-def _serialize_order(order):
-    return {
-        "order_id": order.order_id,
-        "cart_id": order.cart_id,
-        "items": order.items,
-        "total": order.total,
-        "status": order.status,
-        "created_at": order.created_at.isoformat(),
-        "updated_at": order.updated_at.isoformat(),
-    }
-
-
 @app.post("/orders")
-def create_order_endpoint(
-    payload: CreateOrderRequest,
-    current_user: User | None = Depends(get_optional_current_user),
-):
+def create_order_endpoint(payload: CreateOrderRequest):
     try:
-        if current_user is None:
-            order_id = order_manager.create_order(payload.cart_id)
-        else:
-            order_id = order_manager.create_order(
-                payload.cart_id, current_user.user_id
-            )
+        order_id = order_manager.create_order(payload.cart_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return _serialize_order(order_manager.find_order(order_id))
-
-
-@app.get("/orders/me")
-def list_my_orders_endpoint(
-    current_user: User = Depends(get_current_user),
-):
-    return [
-        _serialize_order(order)
-        for order in order_manager.list_for_user(current_user.user_id)
-    ]
-
-
-@app.get("/orders/{order_id}")
-def get_order_endpoint(
-    order_id: str,
-    current_user: User = Depends(get_current_user),
-):
-    order = order_manager.find_for_user(order_id, current_user.user_id)
-    if order is None:
-        raise HTTPException(status_code=404, detail="Order not found")
-    return _serialize_order(order)
-
-
-@app.patch("/orders/{order_id}/status")
-def update_order_status_endpoint(
-    order_id: str,
-    payload: UpdateOrderStatusRequest,
-    current_user: User = Depends(get_current_user),
-):
-    try:
-        order = order_manager.update_status(
-            order_id, current_user.user_id, payload.status
-        )
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=exc.args[0]) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return _serialize_order(order)
+    order = order_manager.find_order(order_id)
+    return {"order_id": order_id, "total": order.total}
 
 @app.post("/books")
 def add_book_endpoint(payload: AddBookRequest):

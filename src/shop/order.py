@@ -13,7 +13,7 @@ class OrderManager:
         self.cart_registry = cart_registry
         self.orders: dict[str, Order] = {}
 
-    def create_order(self, cart_id: str, user_id: str | None = None) -> str:
+    def create_order(self, cart_id: str) -> str:
         cart = self.cart_registry.find_cart(cart_id)
         if cart is None:
             raise ValueError("cart not found")
@@ -37,30 +37,10 @@ class OrderManager:
 
         order_id = uuid4().hex
         self.orders[order_id] = Order(
-            order_id, cart_id, cart.items.copy(), total, user_id
+            order_id, cart_id, cart.items.copy(), total
         )
         cart.is_checked_out = True
         return order_id
 
     def find_order(self, order_id: str) -> Order | None:
         return self.orders.get(order_id)
-
-    def list_for_user(self, user_id: str) -> list[Order]:
-        return [
-            order for order in self.orders.values() if order.user_id == user_id
-        ]
-
-    def find_for_user(self, order_id: str, user_id: str) -> Order | None:
-        order = self.find_order(order_id)
-        if order is None or order.user_id != user_id:
-            return None
-        return order
-
-    def update_status(
-        self, order_id: str, user_id: str, new_status: str
-    ) -> Order:
-        order = self.find_for_user(order_id, user_id)
-        if order is None:
-            raise KeyError("order not found")
-        order.update_status(new_status)
-        return order
