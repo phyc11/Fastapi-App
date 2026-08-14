@@ -204,19 +204,8 @@ def test_endpoints_delegate_to_services(monkeypatch):
     )
     assert cart_calls == [("cart", "product-id", 1)]
 
-    class TimestampStub:
-        @staticmethod
-        def isoformat():
-            return "2026-08-14T00:00:00+00:00"
-
     class OrderStub:
-        order_id = "order-id"
-        cart_id = "cart"
-        items = {"product-id": 1}
         total = 20.0
-        status = "pending"
-        created_at = TimestampStub()
-        updated_at = TimestampStub()
 
     monkeypatch.setattr(
         order_manager,
@@ -225,6 +214,5 @@ def test_endpoints_delegate_to_services(monkeypatch):
     )
     monkeypatch.setattr(order_manager, "find_order", lambda order_id: OrderStub())
     response = client.post("/orders", json={"cart_id": "cart"})
-    assert response.json()["order_id"] == "order-id"
-    assert response.json()["total"] == 20.0
+    assert response.json() == {"order_id": "order-id", "total": 20.0}
     assert order_calls == ["cart"]
