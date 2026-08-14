@@ -14,12 +14,14 @@ WEBP = b"RIFF\x04\x00\x00\x00WEBP" + b"data"
 def clear_state():
     auth_service.users.clear()
     auth_service.user_ids_by_email.clear()
+    auth_service.sessions.clear()
     image_storage.avatars.clear()
     image_storage.product_images.clear()
     product_catalog.products.clear()
     yield
     auth_service.users.clear()
     auth_service.user_ids_by_email.clear()
+    auth_service.sessions.clear()
     image_storage.avatars.clear()
     image_storage.product_images.clear()
     product_catalog.products.clear()

@@ -48,6 +48,10 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
+
 class CreateNotificationRequest(BaseModel):
     type: str
     message: str
@@ -476,16 +480,66 @@ def register_user_endpoint(payload: RegisterUserRequest):
     return _serialize_user(user)
 
 
+def _serialize_session(session):
+    return {
+        "session_id": session.session_id,
+        "created_at": session.created_at.isoformat(),
+        "last_used_at": session.last_used_at.isoformat(),
+        "expires_at": session.expires_at.isoformat(),
+        "is_active": session.is_active,
+        "revoked_at": (
+            session.revoked_at.isoformat()
+            if session.revoked_at is not None
+            else None
+        ),
+    }
+
+
 @app.post("/auth/login")
 def login_endpoint(payload: LoginRequest):
     try:
         user = auth_service.authenticate(payload.email, payload.password)
     except ValueError as exc:
         raise HTTPException(status_code=401, detail=str(exc)) from exc
+    access_token, refresh_token = auth_service.create_session(user)
     return {
-        "access_token": auth_service.create_access_token(user),
+        "access_token": access_token,
+        "refresh_token": refresh_token,
         "token_type": "bearer",
+        "expires_in": auth_service.access_token_minutes * 60,
     }
+
+
+@app.post("/auth/refresh")
+def refresh_token_endpoint(payload: RefreshTokenRequest):
+    try:
+        access_token, refresh_token = auth_service.refresh(
+            payload.refresh_token
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "expires_in": auth_service.access_token_minutes * 60,
+    }
+
+
+@app.post("/auth/logout", status_code=204)
+def logout_endpoint(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    current_user: User = Depends(get_current_user),
+):
+    auth_service.revoke_access_token(credentials.credentials)
+
+
+@app.get("/auth/sessions")
+def list_sessions_endpoint(current_user: User = Depends(get_current_user)):
+    return [
+        _serialize_session(session)
+        for session in auth_service.list_sessions(current_user.user_id)
+    ]
 
 
 @app.get("/users/me")
