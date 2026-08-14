@@ -11,10 +11,12 @@ client = TestClient(app)
 def clear_state():
     auth_service.users.clear()
     auth_service.user_ids_by_email.clear()
+    auth_service.sessions.clear()
     notification_service.notifications.clear()
     yield
     auth_service.users.clear()
     auth_service.user_ids_by_email.clear()
+    auth_service.sessions.clear()
     notification_service.notifications.clear()
 
 

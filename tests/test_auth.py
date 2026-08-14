@@ -12,9 +12,11 @@ client = TestClient(app)
 def clear_users():
     auth_service.users.clear()
     auth_service.user_ids_by_email.clear()
+    auth_service.sessions.clear()
     yield
     auth_service.users.clear()
     auth_service.user_ids_by_email.clear()
+    auth_service.sessions.clear()
 
 
 def test_register_hashes_password_and_normalizes_email():
