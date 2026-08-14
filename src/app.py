@@ -16,6 +16,7 @@ from src.library.book import Catalog
 from src.library.loan import LoanManager
 from src.library.member import MemberRegistry
 from src.notifications.service import Notification, NotificationService
+from src.reviews.service import Review, ReviewService
 from src.shop.cart import CartRegistry
 from src.shop.catalog import ProductCatalog
 from src.shop.order import OrderManager
@@ -55,6 +56,11 @@ class RefreshTokenRequest(BaseModel):
 class CreateNotificationRequest(BaseModel):
     type: str
     message: str
+
+
+class ReviewRequest(BaseModel):
+    rating: int
+    comment: str = ""
 
 
 class CreateAccountRequest(BaseModel):
@@ -547,7 +553,94 @@ def get_current_user_endpoint(current_user: User = Depends(get_current_user)):
     return _serialize_user(current_user)
 
 
+review_service = ReviewService(product_catalog, mean)
 expense_tracker = ExpenseTracker(mean, sort_numbers)
+
+
+def _serialize_review(review: Review):
+    return {
+        "review_id": review.review_id,
+        "product_id": review.product_id,
+        "rating": review.rating,
+        "comment": review.comment,
+        "created_at": review.created_at.isoformat(),
+        "updated_at": review.updated_at.isoformat(),
+    }
+
+
+@app.post("/products/{product_id}/reviews", status_code=201)
+def create_review_endpoint(
+    product_id: str,
+    payload: ReviewRequest,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        review = review_service.create(
+            product_id,
+            current_user.user_id,
+            payload.rating,
+            payload.comment,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=exc.args[0]) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _serialize_review(review)
+
+
+@app.get("/products/{product_id}/reviews")
+def list_product_reviews_endpoint(product_id: str):
+    try:
+        reviews = review_service.list_for_product(product_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=exc.args[0]) from exc
+    return [_serialize_review(review) for review in reviews]
+
+
+@app.patch("/products/{product_id}/reviews/me")
+def update_my_review_endpoint(
+    product_id: str,
+    payload: ReviewRequest,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        review = review_service.update_mine(
+            product_id,
+            current_user.user_id,
+            payload.rating,
+            payload.comment,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=exc.args[0]) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _serialize_review(review)
+
+
+@app.delete("/products/{product_id}/reviews/me", status_code=204)
+def delete_my_review_endpoint(
+    product_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        review_service.delete_mine(product_id, current_user.user_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=exc.args[0]) from exc
+
+
+@app.get("/products/{product_id}/rating")
+def product_rating_endpoint(product_id: str):
+    try:
+        average_rating, review_count = review_service.rating_summary(product_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=exc.args[0]) from exc
+    return {
+        "product_id": product_id,
+        "average_rating": (
+            round(average_rating, 2) if average_rating is not None else None
+        ),
+        "review_count": review_count,
+    }
 
 
 def _serialize_transaction(transaction_id, transaction):
