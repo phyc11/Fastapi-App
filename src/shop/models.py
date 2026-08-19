@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from math import isfinite
 
 
@@ -44,8 +45,17 @@ class Order:
         cart_id: str,
         items: dict[str, int],
         total: int | float,
+        created_at: datetime | None = None,
     ) -> None:
         self.order_id = order_id
         self.cart_id = cart_id
         self.items = items
         self.total = total
+        now = datetime.now(timezone.utc)
+        if created_at is not None:
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=timezone.utc)
+            self.created_at = created_at
+        else:
+            self.created_at = now
+

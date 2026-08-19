@@ -8,6 +8,7 @@ from fastapi import Depends, FastAPI, HTTPException, UploadFile
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
+from src.analytics.service import AnalyticsService
 from src.auth.service import AuthService, User
 from src.bank_account import BankAccount, account_registry
 from src.coupons.service import Coupon, CouponService
@@ -38,6 +39,9 @@ product_catalog = ProductCatalog()
 cart_registry = CartRegistry(product_catalog)
 order_manager = OrderManager(product_catalog, cart_registry)
 coupon_service = CouponService()
+analytics_service = AnalyticsService(
+    order_manager, product_catalog, inventory_manager, auth_service
+)
 
 
 class RegisterUserRequest(BaseModel):
@@ -894,6 +898,27 @@ def delete_coupon_endpoint(
         coupon_service.deactivate_coupon(code)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=exc.args[0]) from exc
+
+
+@app.get("/analytics/dashboard")
+def get_analytics_dashboard_endpoint():
+    return analytics_service.get_dashboard_summary()
+
+
+@app.get("/analytics/sales-chart")
+def get_sales_chart_endpoint(period: str = "day"):
+    try:
+        return analytics_service.get_sales_chart(period=period)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/analytics/low-stock-alert")
+def get_low_stock_alert_endpoint(threshold: int = 10):
+    try:
+        return analytics_service.get_low_stock_alerts(threshold=threshold)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 @app.post("/books")
 def add_book_endpoint(payload: AddBookRequest):
