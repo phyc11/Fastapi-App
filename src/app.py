@@ -1,5 +1,5 @@
 import os
-from datetime import date
+from datetime import date, datetime
 from math import isfinite, isqrt, sqrt
 from uuid import uuid4
 
@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from src.auth.service import AuthService, User
 from src.bank_account import BankAccount, account_registry
+from src.coupons.service import Coupon, CouponService
 from src.expense_tracker.tracker import ExpenseTracker
 from src.inventory.manager import InventoryManager
 from src.library.book import Catalog
@@ -36,6 +37,7 @@ loan_manager = LoanManager(catalog, member_registry)
 product_catalog = ProductCatalog()
 cart_registry = CartRegistry(product_catalog)
 order_manager = OrderManager(product_catalog, cart_registry)
+coupon_service = CouponService()
 
 
 class RegisterUserRequest(BaseModel):
@@ -116,6 +118,21 @@ class CreateTransactionRequest(BaseModel):
     category: str
     occurred_on: date | None = None
     description: str = ""
+
+
+class CreateCouponRequest(BaseModel):
+    code: str
+    discount_type: str
+    discount_value: float
+    min_order_value: float = 0.0
+    max_discount_amount: float | None = None
+    max_uses: int | None = None
+    expires_at: datetime | None = None
+
+
+class ValidateCouponRequest(BaseModel):
+    code: str
+    order_amount: float
 
 
 def add(a: int, b: int) -> int:
@@ -815,6 +832,68 @@ def create_order_endpoint(payload: CreateOrderRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     order = order_manager.find_order(order_id)
     return {"order_id": order_id, "total": order.total}
+
+
+def _serialize_coupon(coupon: Coupon):
+    return {
+        "coupon_id": coupon.coupon_id,
+        "code": coupon.code,
+        "discount_type": coupon.discount_type,
+        "discount_value": coupon.discount_value,
+        "min_order_value": coupon.min_order_value,
+        "max_discount_amount": coupon.max_discount_amount,
+        "max_uses": coupon.max_uses,
+        "uses_count": coupon.uses_count,
+        "expires_at": (
+            coupon.expires_at.isoformat() if coupon.expires_at else None
+        ),
+        "is_active": coupon.is_active,
+        "created_at": coupon.created_at.isoformat(),
+    }
+
+
+@app.post("/coupons", status_code=201)
+def create_coupon_endpoint(
+    payload: CreateCouponRequest,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        coupon = coupon_service.create_coupon(
+            code=payload.code,
+            discount_type=payload.discount_type,
+            discount_value=payload.discount_value,
+            min_order_value=payload.min_order_value,
+            max_discount_amount=payload.max_discount_amount,
+            max_uses=payload.max_uses,
+            expires_at=payload.expires_at,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _serialize_coupon(coupon)
+
+
+@app.get("/coupons/active")
+def list_active_coupons_endpoint():
+    coupons = coupon_service.list_active_coupons()
+    return [_serialize_coupon(coupon) for coupon in coupons]
+
+
+@app.post("/coupons/validate")
+def validate_coupon_endpoint(payload: ValidateCouponRequest):
+    return coupon_service.validate_coupon(
+        code=payload.code, order_amount=payload.order_amount
+    )
+
+
+@app.delete("/coupons/{code}", status_code=204)
+def delete_coupon_endpoint(
+    code: str,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        coupon_service.deactivate_coupon(code)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=exc.args[0]) from exc
 
 @app.post("/books")
 def add_book_endpoint(payload: AddBookRequest):
