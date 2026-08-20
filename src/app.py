@@ -24,6 +24,7 @@ from src.shop.catalog import ProductCatalog
 from src.shop.order import OrderManager
 from src.tickets.service import Ticket, TicketReply, TicketService
 from src.uploads.service import ImageStorage, StoredImage
+from src.wishlist.service import WishlistService
 
 app = FastAPI()
 
@@ -44,6 +45,7 @@ analytics_service = AnalyticsService(
     order_manager, product_catalog, inventory_manager, auth_service
 )
 ticket_service = TicketService()
+wishlist_service = WishlistService(product_catalog, cart_registry)
 
 
 class RegisterUserRequest(BaseModel):
@@ -155,6 +157,11 @@ class AddTicketReplyRequest(BaseModel):
 
 class UpdateTicketStatusRequest(BaseModel):
     status: str
+
+
+class MoveToCartRequest(BaseModel):
+    cart_id: str
+    quantity: int = 1
 
 
 def add(a: int, b: int) -> int:
@@ -1043,6 +1050,59 @@ def update_ticket_status_endpoint(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return _serialize_ticket(updated_ticket)
+
+
+@app.post("/wishlist/items/{product_id}", status_code=201)
+def add_wishlist_item_endpoint(
+    product_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        wishlist = wishlist_service.add_item(current_user.user_id, product_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=exc.args[0]) from exc
+    return {
+        "user_id": current_user.user_id,
+        "product_ids": wishlist.product_ids,
+    }
+
+
+@app.delete("/wishlist/items/{product_id}", status_code=204)
+def remove_wishlist_item_endpoint(
+    product_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        wishlist_service.remove_item(current_user.user_id, product_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=exc.args[0]) from exc
+
+
+@app.get("/wishlist/me")
+def list_my_wishlist_endpoint(
+    current_user: User = Depends(get_current_user),
+):
+    return wishlist_service.get_user_wishlist_products(current_user.user_id)
+
+
+@app.post("/wishlist/move-to-cart/{product_id}")
+def move_wishlist_to_cart_endpoint(
+    product_id: str,
+    payload: MoveToCartRequest,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        cart = wishlist_service.move_to_cart(
+            user_id=current_user.user_id,
+            product_id=product_id,
+            cart_id=payload.cart_id,
+            quantity=payload.quantity,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=exc.args[0]) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _serialize_cart(cart)
 
 @app.post("/books")
 def add_book_endpoint(payload: AddBookRequest):
