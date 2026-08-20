@@ -22,6 +22,7 @@ from src.reviews.service import Review, ReviewService
 from src.shop.cart import CartRegistry
 from src.shop.catalog import ProductCatalog
 from src.shop.order import OrderManager
+from src.tickets.service import Ticket, TicketReply, TicketService
 from src.uploads.service import ImageStorage, StoredImage
 
 app = FastAPI()
@@ -42,6 +43,7 @@ coupon_service = CouponService()
 analytics_service = AnalyticsService(
     order_manager, product_catalog, inventory_manager, auth_service
 )
+ticket_service = TicketService()
 
 
 class RegisterUserRequest(BaseModel):
@@ -137,6 +139,22 @@ class CreateCouponRequest(BaseModel):
 class ValidateCouponRequest(BaseModel):
     code: str
     order_amount: float
+
+
+class CreateTicketRequest(BaseModel):
+    title: str
+    category: str = "general"
+    description: str
+    attachments: list[str] = []
+
+
+class AddTicketReplyRequest(BaseModel):
+    message: str
+    attachments: list[str] = []
+
+
+class UpdateTicketStatusRequest(BaseModel):
+    status: str
 
 
 def add(a: int, b: int) -> int:
@@ -919,6 +937,112 @@ def get_low_stock_alert_endpoint(threshold: int = 10):
         return analytics_service.get_low_stock_alerts(threshold=threshold)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+def _serialize_ticket_reply(reply: TicketReply):
+    return {
+        "reply_id": reply.reply_id,
+        "ticket_id": reply.ticket_id,
+        "user_id": reply.user_id,
+        "message": reply.message,
+        "attachments": reply.attachments,
+        "created_at": reply.created_at.isoformat(),
+    }
+
+
+def _serialize_ticket(ticket: Ticket):
+    return {
+        "ticket_id": ticket.ticket_id,
+        "user_id": ticket.user_id,
+        "title": ticket.title,
+        "category": ticket.category,
+        "description": ticket.description,
+        "attachments": ticket.attachments,
+        "status": ticket.status,
+        "replies": [_serialize_ticket_reply(r) for r in ticket.replies],
+        "created_at": ticket.created_at.isoformat(),
+        "updated_at": ticket.updated_at.isoformat(),
+    }
+
+
+@app.post("/tickets", status_code=201)
+def create_ticket_endpoint(
+    payload: CreateTicketRequest,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        ticket = ticket_service.create_ticket(
+            user_id=current_user.user_id,
+            title=payload.title,
+            category=payload.category,
+            description=payload.description,
+            attachments=payload.attachments,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _serialize_ticket(ticket)
+
+
+@app.get("/tickets/me")
+def list_my_tickets_endpoint(
+    current_user: User = Depends(get_current_user),
+):
+    tickets = ticket_service.list_for_user(current_user.user_id)
+    return [_serialize_ticket(t) for t in tickets]
+
+
+@app.get("/tickets/{ticket_id}")
+def get_ticket_endpoint(
+    ticket_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    ticket = ticket_service.get_ticket(ticket_id)
+    if ticket is None:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    if ticket.user_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Access forbidden")
+    return _serialize_ticket(ticket)
+
+
+@app.post("/tickets/{ticket_id}/replies", status_code=201)
+def add_ticket_reply_endpoint(
+    ticket_id: str,
+    payload: AddTicketReplyRequest,
+    current_user: User = Depends(get_current_user),
+):
+    ticket = ticket_service.get_ticket(ticket_id)
+    if ticket is None:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    if ticket.user_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Access forbidden")
+    try:
+        reply = ticket_service.add_reply(
+            ticket_id=ticket_id,
+            user_id=current_user.user_id,
+            message=payload.message,
+            attachments=payload.attachments,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _serialize_ticket_reply(reply)
+
+
+@app.patch("/tickets/{ticket_id}/status")
+def update_ticket_status_endpoint(
+    ticket_id: str,
+    payload: UpdateTicketStatusRequest,
+    current_user: User = Depends(get_current_user),
+):
+    ticket = ticket_service.get_ticket(ticket_id)
+    if ticket is None:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    if ticket.user_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Access forbidden")
+    try:
+        updated_ticket = ticket_service.update_status(ticket_id, payload.status)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _serialize_ticket(updated_ticket)
 
 @app.post("/books")
 def add_book_endpoint(payload: AddBookRequest):
