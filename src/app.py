@@ -22,6 +22,11 @@ from src.reviews.service import Review, ReviewService
 from src.shop.cart import CartRegistry
 from src.shop.catalog import ProductCatalog
 from src.shop.order import OrderManager
+from src.shipping.service import (
+    ShipmentTracking,
+    ShippingAddress,
+    ShippingService,
+)
 from src.tickets.service import Ticket, TicketReply, TicketService
 from src.uploads.service import ImageStorage, StoredImage
 from src.wishlist.service import WishlistService
@@ -46,6 +51,7 @@ analytics_service = AnalyticsService(
 )
 ticket_service = TicketService()
 wishlist_service = WishlistService(product_catalog, cart_registry)
+shipping_service = ShippingService()
 
 
 class RegisterUserRequest(BaseModel):
@@ -162,6 +168,20 @@ class UpdateTicketStatusRequest(BaseModel):
 class MoveToCartRequest(BaseModel):
     cart_id: str
     quantity: int = 1
+
+
+class CreateShippingAddressRequest(BaseModel):
+    full_name: str
+    phone: str
+    street_address: str
+    city: str
+    is_default: bool = False
+
+
+class CalculateShippingFeeRequest(BaseModel):
+    city: str
+    weight_kg: float
+    order_amount: float = 0.0
 
 
 def add(a: int, b: int) -> int:
@@ -1103,6 +1123,100 @@ def move_wishlist_to_cart_endpoint(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return _serialize_cart(cart)
+
+
+def _serialize_shipping_address(addr: ShippingAddress):
+    return {
+        "address_id": addr.address_id,
+        "user_id": addr.user_id,
+        "full_name": addr.full_name,
+        "phone": addr.phone,
+        "street_address": addr.street_address,
+        "city": addr.city,
+        "is_default": addr.is_default,
+        "created_at": addr.created_at.isoformat(),
+    }
+
+
+def _serialize_shipment_tracking(shipment: ShipmentTracking):
+    return {
+        "tracking_number": shipment.tracking_number,
+        "order_id": shipment.order_id,
+        "carrier": shipment.carrier,
+        "current_status": shipment.current_status,
+        "history": [
+            {
+                "event_id": event.event_id,
+                "status": event.status,
+                "location": event.location,
+                "description": event.description,
+                "timestamp": event.timestamp.isoformat(),
+            }
+            for event in shipment.history
+        ],
+    }
+
+
+@app.post("/shipping/addresses", status_code=201)
+def create_shipping_address_endpoint(
+    payload: CreateShippingAddressRequest,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        address = shipping_service.add_address(
+            user_id=current_user.user_id,
+            full_name=payload.full_name,
+            phone=payload.phone,
+            street_address=payload.street_address,
+            city=payload.city,
+            is_default=payload.is_default,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _serialize_shipping_address(address)
+
+
+@app.get("/shipping/addresses/me")
+def list_my_shipping_addresses_endpoint(
+    current_user: User = Depends(get_current_user),
+):
+    addresses = shipping_service.get_user_addresses(current_user.user_id)
+    return [_serialize_shipping_address(addr) for addr in addresses]
+
+
+@app.put("/shipping/addresses/{address_id}/default")
+def set_default_shipping_address_endpoint(
+    address_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        updated = shipping_service.set_default_address(
+            user_id=current_user.user_id, address_id=address_id
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=exc.args[0]) from exc
+    return _serialize_shipping_address(updated)
+
+
+@app.post("/shipping/calculate-fee")
+def calculate_shipping_fee_endpoint(payload: CalculateShippingFeeRequest):
+    try:
+        return shipping_service.calculate_fee(
+            city=payload.city,
+            weight_kg=payload.weight_kg,
+            order_amount=payload.order_amount,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/shipping/track/{tracking_number}")
+def track_shipment_endpoint(tracking_number: str):
+    try:
+        shipment = shipping_service.track_shipment(tracking_number)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=exc.args[0]) from exc
+    return _serialize_shipment_tracking(shipment)
 
 @app.post("/books")
 def add_book_endpoint(payload: AddBookRequest):
