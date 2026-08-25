@@ -24,6 +24,7 @@ from src.shop.cart import CartRegistry
 from src.shop.catalog import ProductCatalog
 from src.shop.order import OrderManager
 from src.flash_sale.service import FlashSaleItem, FlashSaleService
+from src.rewards.service import RewardService, RewardTransaction
 from src.shipping.service import (
     ShipmentTracking,
     ShippingAddress,
@@ -56,6 +57,7 @@ wishlist_service = WishlistService(product_catalog, cart_registry)
 shipping_service = ShippingService()
 flash_sale_service = FlashSaleService(product_catalog)
 audit_log_service = AuditLogService()
+reward_service = RewardService(coupon_service)
 
 
 class RegisterUserRequest(BaseModel):
@@ -198,6 +200,10 @@ class CreateFlashSaleRequest(BaseModel):
 
 class BuyFlashSaleRequest(BaseModel):
     quantity: int = 1
+
+
+class RedeemPointsRequest(BaseModel):
+    points: int
 
 
 def add(a: int, b: int) -> int:
@@ -1340,6 +1346,56 @@ def search_audit_logs_admin_endpoint(
         end_date=end_date,
     )
     return [_serialize_audit_log_entry(e) for e in entries]
+
+
+def _serialize_reward_transaction(tx: RewardTransaction):
+    return {
+        "transaction_id": tx.transaction_id,
+        "type": tx.type,
+        "points": tx.points,
+        "description": tx.description,
+        "timestamp": tx.timestamp.isoformat(),
+    }
+
+
+@app.get("/rewards/me")
+def get_my_rewards_endpoint(
+    current_user: User = Depends(get_current_user),
+):
+    account = reward_service.get_user_account(current_user.user_id)
+    tier_info = reward_service.calculate_tier(account.lifetime_points)
+    return {
+        "user_id": current_user.user_id,
+        "points_balance": account.points_balance,
+        "lifetime_points": account.lifetime_points,
+        "tier": tier_info["tier"],
+        "multiplier": tier_info["multiplier"],
+        "benefits": tier_info["benefits"],
+        "next_tier": tier_info["next_tier"],
+        "points_to_next_tier": tier_info["points_to_next_tier"],
+        "recent_transactions": [
+            _serialize_reward_transaction(tx)
+            for tx in reversed(account.transactions)
+        ],
+    }
+
+
+@app.get("/rewards/tiers")
+def list_reward_tiers_endpoint():
+    return reward_service.get_tier_benefits()
+
+
+@app.post("/rewards/redeem")
+def redeem_reward_points_endpoint(
+    payload: RedeemPointsRequest,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return reward_service.redeem_points(
+            user_id=current_user.user_id, points_to_redeem=payload.points
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 @app.post("/books")
 def add_book_endpoint(payload: AddBookRequest):
