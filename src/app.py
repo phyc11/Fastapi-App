@@ -4,11 +4,12 @@ from math import isfinite, isqrt, sqrt
 from uuid import uuid4
 
 import uvicorn
-from fastapi import Depends, FastAPI, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, HTTPException, Request, UploadFile
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
 from src.analytics.service import AnalyticsService
+from src.audit_logs.service import AuditLogEntry, AuditLogService
 from src.auth.service import AuthService, User
 from src.bank_account import BankAccount, account_registry
 from src.coupons.service import Coupon, CouponService
@@ -54,6 +55,7 @@ ticket_service = TicketService()
 wishlist_service = WishlistService(product_catalog, cart_registry)
 shipping_service = ShippingService()
 flash_sale_service = FlashSaleService(product_catalog)
+audit_log_service = AuditLogService()
 
 
 class RegisterUserRequest(BaseModel):
@@ -558,11 +560,13 @@ def mark_notification_read_endpoint(
     return _serialize_notification(notification)
 
 @app.post("/auth/register", status_code=201)
-def register_user_endpoint(payload: RegisterUserRequest):
+def register_user_endpoint(payload: RegisterUserRequest, request: Request):
     try:
         user = auth_service.register(payload.name, payload.email, payload.password)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    ip, ua = _get_request_client_info(request)
+    audit_log_service.record_log(user.user_id, "USER_REGISTER", "/auth/register", ip, ua)
     return _serialize_user(user)
 
 
@@ -582,12 +586,14 @@ def _serialize_session(session):
 
 
 @app.post("/auth/login")
-def login_endpoint(payload: LoginRequest):
+def login_endpoint(payload: LoginRequest, request: Request):
     try:
         user = auth_service.authenticate(payload.email, payload.password)
     except ValueError as exc:
         raise HTTPException(status_code=401, detail=str(exc)) from exc
     access_token, refresh_token = auth_service.create_session(user)
+    ip, ua = _get_request_client_info(request)
+    audit_log_service.record_log(user.user_id, "USER_LOGIN", "/auth/login", ip, ua)
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
@@ -1288,6 +1294,52 @@ def buy_flash_sale_endpoint(
         raise HTTPException(status_code=404, detail=exc.args[0]) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+def _get_request_client_info(request: Request) -> tuple[str, str]:
+    ip_address = request.client.host if request.client else "127.0.0.1"
+    user_agent = request.headers.get("user-agent", "")
+    return ip_address, user_agent
+
+
+def _serialize_audit_log_entry(entry: AuditLogEntry):
+    return {
+        "log_id": entry.log_id,
+        "user_id": entry.user_id,
+        "action": entry.action,
+        "resource": entry.resource,
+        "ip_address": entry.ip_address,
+        "user_agent": entry.user_agent,
+        "details": entry.details,
+        "timestamp": entry.timestamp.isoformat(),
+    }
+
+
+@app.get("/audit-logs/me")
+def list_my_audit_logs_endpoint(
+    current_user: User = Depends(get_current_user),
+):
+    entries = audit_log_service.get_user_logs(current_user.user_id)
+    return [_serialize_audit_log_entry(e) for e in entries]
+
+
+@app.get("/audit-logs/admin")
+def search_audit_logs_admin_endpoint(
+    action: str | None = None,
+    target_user_id: str | None = None,
+    ip_address: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    current_user: User = Depends(get_current_user),
+):
+    entries = audit_log_service.search_logs(
+        action=action,
+        user_id=target_user_id,
+        ip_address=ip_address,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    return [_serialize_audit_log_entry(e) for e in entries]
 
 @app.post("/books")
 def add_book_endpoint(payload: AddBookRequest):
