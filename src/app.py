@@ -22,6 +22,7 @@ from src.reviews.service import Review, ReviewService
 from src.shop.cart import CartRegistry
 from src.shop.catalog import ProductCatalog
 from src.shop.order import OrderManager
+from src.flash_sale.service import FlashSaleItem, FlashSaleService
 from src.shipping.service import (
     ShipmentTracking,
     ShippingAddress,
@@ -52,6 +53,7 @@ analytics_service = AnalyticsService(
 ticket_service = TicketService()
 wishlist_service = WishlistService(product_catalog, cart_registry)
 shipping_service = ShippingService()
+flash_sale_service = FlashSaleService(product_catalog)
 
 
 class RegisterUserRequest(BaseModel):
@@ -182,6 +184,18 @@ class CalculateShippingFeeRequest(BaseModel):
     city: str
     weight_kg: float
     order_amount: float = 0.0
+
+
+class CreateFlashSaleRequest(BaseModel):
+    product_id: str
+    flash_price: float
+    quantity_limit: int
+    start_time: datetime
+    end_time: datetime
+
+
+class BuyFlashSaleRequest(BaseModel):
+    quantity: int = 1
 
 
 def add(a: int, b: int) -> int:
@@ -1217,6 +1231,63 @@ def track_shipment_endpoint(tracking_number: str):
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=exc.args[0]) from exc
     return _serialize_shipment_tracking(shipment)
+
+
+def _serialize_flash_sale_item(item: FlashSaleItem):
+    return {
+        "flash_sale_id": item.flash_sale_id,
+        "product_id": item.product_id,
+        "flash_price": item.flash_price,
+        "quantity_limit": item.quantity_limit,
+        "sold_count": item.sold_count,
+        "remaining_quantity": item.remaining_quantity,
+        "start_time": item.start_time.isoformat(),
+        "end_time": item.end_time.isoformat(),
+        "is_active": item.is_active,
+    }
+
+
+@app.post("/flash-sale", status_code=201)
+def create_flash_sale_endpoint(
+    payload: CreateFlashSaleRequest,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        flash_sale = flash_sale_service.create_flash_sale(
+            product_id=payload.product_id,
+            flash_price=payload.flash_price,
+            quantity_limit=payload.quantity_limit,
+            start_time=payload.start_time,
+            end_time=payload.end_time,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=exc.args[0]) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _serialize_flash_sale_item(flash_sale)
+
+
+@app.get("/flash-sale/active")
+def list_active_flash_sales_endpoint():
+    return flash_sale_service.get_active_flash_sales()
+
+
+@app.post("/flash-sale/buy/{product_id}")
+def buy_flash_sale_endpoint(
+    product_id: str,
+    payload: BuyFlashSaleRequest,
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        return flash_sale_service.buy_flash_sale_product(
+            product_id=product_id,
+            quantity=payload.quantity,
+            user_id=current_user.user_id,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=exc.args[0]) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 @app.post("/books")
 def add_book_endpoint(payload: AddBookRequest):
